@@ -7,6 +7,11 @@ import math
 st.set_page_config(page_title="Dashboard Finansial", layout="wide")
 st.title(":blue[Dashboard Simulasi Finansial]")
 
+# --- INITIALIZATION (Menyimpan state agar sinkron antar tab) ---
+if 'modal_awal' not in st.session_state: st.session_state.modal_awal = 1000000000
+if 'tambahan_tahunan' not in st.session_state: st.session_state.tambahan_tahunan = 0
+if 'dividen_tahun' not in st.session_state: st.session_state.dividen_tahun = 7.0
+
 # Database internal Suku Bunga Perbankan
 db_bank = {
     "Bank Himbara (BUMN)": {
@@ -23,7 +28,7 @@ db_bank = {
 tab1, tab2, tab3 = st.tabs(["Kalkulator Pinjaman Institusi", "Simulasi Investasi Bertahap", "Analisis Ekuitas Bersih"])
 
 # ==========================================
-# TAB 1: KALKULATOR PINJAMAN INSTITUSI
+# TAB 1: KALKULATOR PINJAMAN
 # ==========================================
 with tab1:
     st.header(":orange[Kalkulator Pinjaman Berbasis Data Pasar]")
@@ -69,18 +74,20 @@ with tab2:
     st.header(":violet[Simulasi Investasi Bertahap]")
     col3, col4 = st.columns([1, 3])
     with col3:
-        modal_awal = st.number_input("Modal Awal (Rp)", value=1000000000, step=1000000)
-        tambahan_tahunan = st.number_input("Suntikan Dana per Tahun (Rp)", value=0, step=10000000)
-        dividen_tahun = st.number_input("Target Pertumbuhan (%)", value=7.0, step=0.1)
+        st.subheader("Parameter Investasi")
+        # Menggunakan session_state agar nilai tersimpan permanen
+        st.session_state.modal_awal = st.number_input("Modal Awal (Rp)", value=st.session_state.modal_awal, step=1000000)
+        st.session_state.tambahan_tahunan = st.number_input("Suntikan Dana per Tahun (Rp)", value=st.session_state.tambahan_tahunan, step=10000000)
+        st.session_state.dividen_tahun = st.number_input("Target Pertumbuhan (%)", value=st.session_state.dividen_tahun, step=0.1)
         lama_investasi = st.slider("Lama Investasi (Tahun)", 1, 50, 20)
         
     with col4:
         data_inv = []
-        saldo = modal_awal
-        total_setor = modal_awal
+        saldo = st.session_state.modal_awal
+        total_setor = st.session_state.modal_awal
         for t in range(1, lama_investasi + 1):
-            if t > 1: saldo += tambahan_tahunan; total_setor += tambahan_tahunan
-            saldo *= (1 + dividen_tahun/100)
+            if t > 1: saldo += st.session_state.tambahan_tahunan; total_setor += st.session_state.tambahan_tahunan
+            saldo *= (1 + st.session_state.dividen_tahun/100)
             data_inv.append([t, total_setor, saldo - total_setor, saldo])
         df_invest = pd.DataFrame(data_inv, columns=["Tahun", "Total Modal", "Profit", "Total Portofolio"])
         st.line_chart(df_invest.set_index("Tahun"))
@@ -90,24 +97,24 @@ with tab2:
 # ==========================================
 with tab3:
     st.header(":red[Analisis Persilangan: Hasil Dividen vs Beban Pinjaman]")
-    st.write("Grafik ini mengukur momentum kapan murni Keuntungan Dividen Anda berhasil memotong dan melampaui total akumulasi dana kas yang telah Anda bayarkan ke bank.")
+    st.write("Grafik ini menarik data dari input Tab 2 dan jadwal cicilan Tab 1 secara real-time.")
     
-    # Menghitung rata-rata cicilan sebagai referensi beban kas
+    # Mengambil nilai dari session_state agar sinkron 100%
+    modal_awal = st.session_state.modal_awal
+    tambahan_tahunan = st.session_state.tambahan_tahunan
+    dividen_tahun = st.session_state.dividen_tahun
     cicilan_per_bulan = df_jadwal["Total Angsuran"].mean()
     
     max_tahun = max(lama_investasi, math.ceil(tenor_bulan / 12))
     data_cross = []
     
     for thn in range(1, max_tahun + 1):
-        # 1. Menghitung Murni Akumulasi Dividen (Profit saja)
         if thn <= lama_investasi:
             nilai_investasi = modal_awal * (1 + (dividen_tahun / 100))**thn
         else:
             nilai_investasi = modal_awal * (1 + (dividen_tahun / 100))**lama_investasi
             
-        akumulasi_dividen = nilai_investasi - modal_awal # HANYA PROFIT
-            
-        # 2. Menghitung Akumulasi Beban Pinjaman (Cash Outflow)
+        akumulasi_dividen = nilai_investasi - modal_awal
         bulan_berjalan = min(thn * 12, tenor_bulan)
         akumulasi_cicilan = bulan_berjalan * cicilan_per_bulan
         
@@ -116,27 +123,8 @@ with tab3:
     df_cross = pd.DataFrame(data_cross, columns=["Tahun", "Akumulasi Dividen", "Akumulasi Pembayaran"])
     
     fig_cross = go.Figure()
+    fig_cross.add_trace(go.Scatter(x=df_cross["Tahun"], y=df_cross["Akumulasi Dividen"], name="Akumulasi Dividen (Profit)", line=dict(color='#00CC96', width=3)))
+    fig_cross.add_trace(go.Scatter(x=df_cross["Tahun"], y=df_cross["Akumulasi Pembayaran"], name="Total Setoran ke Bank (Beban)", line=dict(color='#EF553B', width=3)))
     
-    # Garis Profit Dividen (Hijau)
-    fig_cross.add_trace(go.Scatter(
-        x=df_cross["Tahun"], y=df_cross["Akumulasi Dividen"], 
-        mode='lines+markers', name="Akumulasi Dividen (Profit)", 
-        line=dict(color='#00CC96', width=3)
-    ))
-    
-    # Garis Beban Kas (Merah)
-    fig_cross.add_trace(go.Scatter(
-        x=df_cross["Tahun"], y=df_cross["Akumulasi Pembayaran"], 
-        mode='lines+markers', name="Total Setoran ke Bank (Beban)", 
-        line=dict(color='#EF553B', width=3)
-    ))
-    
-    fig_cross.update_layout(
-        title="Kurva Break-Even (Keuntungan vs Beban)",
-        xaxis_title="Tahun Ke-",
-        yaxis_title="Nominal (Rp)",
-        hovermode="x unified",
-        template="plotly_dark"
-    )
-    
+    fig_cross.update_layout(title="Kurva Break-Even (Keuntungan vs Beban)", template="plotly_dark")
     st.plotly_chart(fig_cross, use_container_width=True)
