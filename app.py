@@ -73,27 +73,37 @@ with tab2:
     with col3:
         st.subheader("Parameter Input")
         modal_awal = st.number_input("Modal Awal (Rp)", min_value=0, value=1000000000, step=1000000, format="%d", key="modal_dividen")
+        tambahan_tahunan = st.number_input("Tambahan Investasi per Tahun (Mulai Thn ke-2)", min_value=0, value=0, step=10000000, format="%d")
         dividen_tahun = st.number_input("Target Dividen Tahunan (%)", min_value=1.0, value=7.0, step=0.1, format="%.1f")
         lama_investasi = st.slider("Lama Investasi (Tahun)", min_value=1, max_value=50, value=20, step=1)
         
     with col4:
         data_investasi = []
+        saldo_investasi = 0
+        total_modal_disetor = 0
+        
         for tahun in range(1, lama_investasi + 1):
-            total_nilai = modal_awal * (1 + (dividen_tahun / 100))**tahun
-            akumulasi_dividen = total_nilai - modal_awal
-            data_investasi.append([tahun, modal_awal, akumulasi_dividen, total_nilai])
+            if tahun == 1:
+                total_modal_disetor = modal_awal
+                saldo_investasi = modal_awal * (1 + (dividen_tahun / 100))
+            else:
+                total_modal_disetor += tambahan_tahunan
+                saldo_investasi = (saldo_investasi + tambahan_tahunan) * (1 + (dividen_tahun / 100))
+                
+            akumulasi_dividen = saldo_investasi - total_modal_disetor
+            data_investasi.append([tahun, total_modal_disetor, akumulasi_dividen, saldo_investasi])
             
-        df_invest = pd.DataFrame(data_investasi, columns=["Tahun", "Modal Tetap", "Akumulasi Dividen", "Total Portofolio"])
+        df_invest = pd.DataFrame(data_investasi, columns=["Tahun", "Total Modal Disetor", "Akumulasi Dividen", "Total Portofolio"])
         
         nilai_akhir = df_invest["Total Portofolio"].iloc[-1]
         st.subheader(f"Total Nilai Akhir: :green[Rp {nilai_akhir:,.0f}]")
         
         fig_invest = go.Figure()
-        fig_invest.add_trace(go.Scatter(x=df_invest["Tahun"], y=df_invest["Modal Tetap"], mode='lines', stackgroup='one', name="Modal Tetap", fillcolor='#19D3F3', line=dict(width=0))) 
+        fig_invest.add_trace(go.Scatter(x=df_invest["Tahun"], y=df_invest["Total Modal Disetor"], mode='lines', stackgroup='one', name="Total Modal Disetor", fillcolor='#19D3F3', line=dict(width=0))) 
         fig_invest.add_trace(go.Scatter(x=df_invest["Tahun"], y=df_invest["Akumulasi Dividen"], mode='lines', stackgroup='one', name="Akumulasi Dividen", fillcolor='#AB63FA', line=dict(width=0))) 
         
         fig_invest.update_layout(
-            title="Pertumbuhan Portofolio Berdasarkan Dividen",
+            title="Pertumbuhan Portofolio Berdasarkan Dividen & Top-Up",
             xaxis_title="Tahun Ke-",
             yaxis_title="Nilai Portofolio (Rp)",
             hovermode="x unified",
@@ -115,12 +125,19 @@ with tab3:
     max_tahun = max(lama_investasi, math.ceil(tenor_bulan / 12))
     data_cross = []
     
+    saldo_investasi_cross = 0
+    
     for thn in range(1, max_tahun + 1):
-        # 1. Menghitung Total Nilai Aset (Modal + Bunga Majemuk)
-        if thn <= lama_investasi:
-            nilai_aset = modal_awal * (1 + (dividen_tahun / 100))**thn
+        # 1. Menghitung Total Nilai Aset (Iteratif dengan Top-Up)
+        if thn == 1:
+            saldo_investasi_cross = modal_awal * (1 + (dividen_tahun / 100))
+        elif thn <= lama_investasi:
+            saldo_investasi_cross = (saldo_investasi_cross + tambahan_tahunan) * (1 + (dividen_tahun / 100))
         else:
-            nilai_aset = modal_awal * (1 + (dividen_tahun / 100))**lama_investasi
+            # Jika melebihi masa investasi, diasumsikan uang tetap mengendap dan berbunga tanpa top-up baru
+            saldo_investasi_cross = saldo_investasi_cross * (1 + (dividen_tahun / 100))
+            
+        nilai_aset = saldo_investasi_cross
             
         # 2. Menghitung Sisa Pokok Pinjaman di Akhir Tahun Tersebut
         bulan_berjalan = min(thn * 12, tenor_bulan)
@@ -138,14 +155,12 @@ with tab3:
     
     fig_cross = go.Figure()
     
-    # Garis Total Aset (Hijau)
     fig_cross.add_trace(go.Scatter(
         x=df_cross["Tahun"], y=df_cross["Nilai Aset"], 
         mode='lines+markers', name="Total Nilai Aset", 
         line=dict(color='#00CC96', width=3)
     ))
     
-    # Garis Sisa Hutang (Merah)
     fig_cross.add_trace(go.Scatter(
         x=df_cross["Tahun"], y=df_cross["Sisa Hutang"], 
         mode='lines+markers', name="Sisa Pokok Pinjaman", 
@@ -164,7 +179,6 @@ with tab3:
     
     st.plotly_chart(fig_cross, use_container_width=True)
     
-    # Analisis Otomatis Ekuitas
     df_cross['Net Worth'] = df_cross['Nilai Aset'] - df_cross['Sisa Hutang']
     titik_temu = df_cross[df_cross['Net Worth'] > 0]
     
