@@ -20,8 +20,10 @@ with tab1:
     
     with col1:
         st.subheader("Parameter Input")
-        plafon = st.number_input("Plafon Pinjaman (Rp)", min_value=0, value=1000000000, step=1, format="%d")
-        bunga_tahun = st.number_input("Suku Bunga Tahunan (%)", min_value=1.0, value=8.10, step=0.1)
+        # Plafon per 50 juta
+        plafon = st.number_input("Plafon Pinjaman (Rp)", min_value=0, value=1000000000, step=50000000, format="%d")
+        # Suku bunga per 0,01%
+        bunga_tahun = st.number_input("Suku Bunga Tahunan (%)", min_value=1.00, value=8.10, step=0.01, format="%.2f")
         tenor_bulan = st.slider("Tenor Pinjaman (Bulan)", min_value=12, max_value=360, value=240, step=12)
         
     with col2:
@@ -72,8 +74,10 @@ with tab2:
     
     with col3:
         st.subheader("Parameter Input")
-        modal_awal = st.number_input("Modal Awal (Rp)", min_value=0, value=1000000000, step=1, format="%d", key="modal_dividen")
-        dividen_tahun = st.number_input("Target Dividen Tahunan (%)", min_value=1.0, value=7.0, step=0.1)
+        # Modal awal per 1 juta
+        modal_awal = st.number_input("Modal Awal (Rp)", min_value=0, value=1000000000, step=1000000, format="%d", key="modal_dividen")
+        # Dividen per 0,1%
+        dividen_tahun = st.number_input("Target Dividen Tahunan (%)", min_value=1.0, value=7.0, step=0.1, format="%.1f")
         lama_investasi = st.slider("Lama Investasi (Tahun)", min_value=1, max_value=50, value=20, step=1)
         
     with col4:
@@ -112,18 +116,15 @@ with tab3:
     st.header(":red[Analisis Persilangan: Investasi vs Beban Pinjaman]")
     st.write("Grafik ini mengukur momentum kapan nilai aset investasi Anda berhasil memotong dan melampaui total akumulasi dana kas yang telah Anda bayarkan ke bank.")
     
-    # Menentukan batas sumbu X agar pas dengan tenor atau investasi terlama
     max_tahun = max(lama_investasi, math.ceil(tenor_bulan / 12))
     data_cross = []
     
     for thn in range(1, max_tahun + 1):
-        # 1. Menghitung Pertumbuhan Investasi
         if thn <= lama_investasi:
             nilai_investasi = modal_awal * (1 + (dividen_tahun / 100))**thn
         else:
             nilai_investasi = modal_awal * (1 + (dividen_tahun / 100))**lama_investasi
             
-        # 2. Menghitung Akumulasi Beban Pinjaman (Cash Outflow)
         bulan_berjalan = min(thn * 12, tenor_bulan)
         akumulasi_cicilan = bulan_berjalan * cicilan_per_bulan
         
@@ -131,17 +132,14 @@ with tab3:
         
     df_cross = pd.DataFrame(data_cross, columns=["Tahun", "Nilai Investasi", "Akumulasi Pembayaran"])
     
-    # Menggambar Grafik 2 Garis
     fig_cross = go.Figure()
     
-    # Garis Investasi (Hijau)
     fig_cross.add_trace(go.Scatter(
         x=df_cross["Tahun"], y=df_cross["Nilai Investasi"], 
         mode='lines+markers', name="Nilai Investasi (Aset)", 
         line=dict(color='#00CC96', width=3)
     ))
     
-    # Garis Pinjaman (Merah)
     fig_cross.add_trace(go.Scatter(
         x=df_cross["Tahun"], y=df_cross["Akumulasi Pembayaran"], 
         mode='lines+markers', name="Total Setoran ke Bank (Beban)", 
@@ -160,7 +158,6 @@ with tab3:
     
     st.plotly_chart(fig_cross, use_container_width=True)
     
-    # Analisis Otomatis
     df_cross['Selisih'] = df_cross['Nilai Investasi'] - df_cross['Akumulasi Pembayaran']
     titik_temu = df_cross[df_cross['Selisih'] > 0]
     
