@@ -89,17 +89,21 @@ with tab2:
 # TAB 3: ANALISIS EKUITAS BERSIH
 # ==========================================
 with tab3:
-    st.header("Analisis Kekayaan Bersih (Net Worth)")
+    st.header("Analisis Kekayaan Bersih (Net Worth) & Laba Bersih")
     data_cross = []
     saldo_inv = modal_awal
     total_setor = modal_awal
     
-    for thn in range(1, max(lama_investasi, math.ceil(tenor_bulan / 12)) + 1):
+    max_years = max(lama_investasi, math.ceil(tenor_bulan / 12))
+    
+    for thn in range(1, max_years + 1):
         if thn > 1: saldo_inv += tambahan_tahunan; total_setor += tambahan_tahunan
         saldo_inv *= (1 + dividen_tahun/100)
         
         b_ke = min(thn * 12, tenor_bulan)
+        # Ambil sisa hutang dengan pengecekan aman
         sisa_hutang = df_jadwal.loc[b_ke-1, "Sisa Pinjaman"] if b_ke > 0 else plafon
+        # Akumulasi cicilan
         akum_cicilan = df_jadwal.head(b_ke)["Total Angsuran"].sum()
         
         net_asset = max(0, saldo_inv - sisa_hutang)
