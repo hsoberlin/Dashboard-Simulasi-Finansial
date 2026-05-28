@@ -3,12 +3,12 @@ import pandas as pd
 import plotly.graph_objects as go
 import math
 
-# Pengaturan dasar halaman (Tanpa simbol)
+# Pengaturan dasar halaman
 st.set_page_config(page_title="Dashboard Finansial", layout="wide")
 st.title(":blue[Dashboard Simulasi Finansial]")
 
 # Membuat tiga tab terpisah
-tab1, tab2, tab3 = st.tabs(["Kalkulator Pinjaman Anuitas", "Simulasi Bunga Majemuk", "Analisis Titik Temu"])
+tab1, tab2, tab3 = st.tabs(["Kalkulator Pinjaman Anuitas", "Simulasi Bunga Majemuk", "Analisis Ekuitas Bersih"])
 
 # ==========================================
 # TAB 1: KALKULATOR PINJAMAN ANUITAS
@@ -20,9 +20,7 @@ with tab1:
     
     with col1:
         st.subheader("Parameter Input")
-        # Plafon per 50 juta
         plafon = st.number_input("Plafon Pinjaman (Rp)", min_value=0, value=1000000000, step=50000000, format="%d")
-        # Suku bunga per 0,01%
         bunga_tahun = st.number_input("Suku Bunga Tahunan (%)", min_value=1.00, value=8.10, step=0.01, format="%.2f")
         tenor_bulan = st.slider("Tenor Pinjaman (Bulan)", min_value=12, max_value=360, value=240, step=12)
         
@@ -74,9 +72,7 @@ with tab2:
     
     with col3:
         st.subheader("Parameter Input")
-        # Modal awal per 1 juta
         modal_awal = st.number_input("Modal Awal (Rp)", min_value=0, value=1000000000, step=1000000, format="%d", key="modal_dividen")
-        # Dividen per 0,1%
         dividen_tahun = st.number_input("Target Dividen Tahunan (%)", min_value=1.0, value=7.0, step=0.1, format="%.1f")
         lama_investasi = st.slider("Lama Investasi (Tahun)", min_value=1, max_value=50, value=20, step=1)
         
@@ -113,41 +109,51 @@ with tab2:
 # TAB 3: ANALISIS TITIK TEMU (CROSSOVER)
 # ==========================================
 with tab3:
-    st.header(":red[Analisis Persilangan: Investasi vs Beban Pinjaman]")
-    st.write("Grafik ini mengukur momentum kapan nilai aset investasi Anda berhasil memotong dan melampaui total akumulasi dana kas yang telah Anda bayarkan ke bank.")
+    st.header(":red[Analisis Ekuitas: Nilai Aset vs Sisa Hutang]")
+    st.write("Grafik ini mengukur posisi 'Net Worth' (Kekayaan Bersih) Anda. Titik temu terjadi ketika pertumbuhan Total Aset Portofolio Anda resmi melampaui Sisa Pokok Pinjaman di bank.")
     
     max_tahun = max(lama_investasi, math.ceil(tenor_bulan / 12))
     data_cross = []
     
     for thn in range(1, max_tahun + 1):
+        # 1. Menghitung Total Nilai Aset (Modal + Bunga Majemuk)
         if thn <= lama_investasi:
-            nilai_investasi = modal_awal * (1 + (dividen_tahun / 100))**thn
+            nilai_aset = modal_awal * (1 + (dividen_tahun / 100))**thn
         else:
-            nilai_investasi = modal_awal * (1 + (dividen_tahun / 100))**lama_investasi
+            nilai_aset = modal_awal * (1 + (dividen_tahun / 100))**lama_investasi
             
+        # 2. Menghitung Sisa Pokok Pinjaman di Akhir Tahun Tersebut
         bulan_berjalan = min(thn * 12, tenor_bulan)
-        akumulasi_cicilan = bulan_berjalan * cicilan_per_bulan
+        if bulan_berjalan == tenor_bulan:
+            sisa_hutang = 0
+        else:
+            if bunga_bulan > 0:
+                sisa_hutang = plafon * (((1 + bunga_bulan)**tenor_bulan - (1 + bunga_bulan)**bulan_berjalan) / ((1 + bunga_bulan)**tenor_bulan - 1))
+            else:
+                sisa_hutang = max(0, plafon - (cicilan_per_bulan * bulan_berjalan))
         
-        data_cross.append([thn, nilai_investasi, akumulasi_cicilan])
+        data_cross.append([thn, nilai_aset, sisa_hutang])
         
-    df_cross = pd.DataFrame(data_cross, columns=["Tahun", "Nilai Investasi", "Akumulasi Pembayaran"])
+    df_cross = pd.DataFrame(data_cross, columns=["Tahun", "Nilai Aset", "Sisa Hutang"])
     
     fig_cross = go.Figure()
     
+    # Garis Total Aset (Hijau)
     fig_cross.add_trace(go.Scatter(
-        x=df_cross["Tahun"], y=df_cross["Nilai Investasi"], 
-        mode='lines+markers', name="Nilai Investasi (Aset)", 
+        x=df_cross["Tahun"], y=df_cross["Nilai Aset"], 
+        mode='lines+markers', name="Total Nilai Aset", 
         line=dict(color='#00CC96', width=3)
     ))
     
+    # Garis Sisa Hutang (Merah)
     fig_cross.add_trace(go.Scatter(
-        x=df_cross["Tahun"], y=df_cross["Akumulasi Pembayaran"], 
-        mode='lines+markers', name="Total Setoran ke Bank (Beban)", 
+        x=df_cross["Tahun"], y=df_cross["Sisa Hutang"], 
+        mode='lines+markers', name="Sisa Pokok Pinjaman", 
         line=dict(color='#EF553B', width=3)
     ))
     
     fig_cross.update_layout(
-        title="Kurva Arbitrase (Titik Temu Break-Even)",
+        title="Kurva Kekayaan Bersih (Aset vs Liabilitas)",
         xaxis_title="Tahun Ke-",
         yaxis_title="Nominal (Rp)",
         hovermode="x unified",
@@ -158,11 +164,12 @@ with tab3:
     
     st.plotly_chart(fig_cross, use_container_width=True)
     
-    df_cross['Selisih'] = df_cross['Nilai Investasi'] - df_cross['Akumulasi Pembayaran']
-    titik_temu = df_cross[df_cross['Selisih'] > 0]
+    # Analisis Otomatis Ekuitas
+    df_cross['Net Worth'] = df_cross['Nilai Aset'] - df_cross['Sisa Hutang']
+    titik_temu = df_cross[df_cross['Net Worth'] > 0]
     
     if not titik_temu.empty:
         tahun_temu = titik_temu.iloc[0]['Tahun']
-        st.success(f"Berdasarkan parameter saat ini, strategi ini mulai mencetak **Net-Positive (Keuntungan Bersih)** pada **Tahun ke-{tahun_temu:.0f}**. Pada titik ini, nilai investasi Anda sudah melampaui seluruh uang yang Anda setorkan untuk cicilan.")
+        st.success(f"Berdasarkan parameter saat ini, portofolio Anda mencapai **Ekuitas Positif** pada **Tahun ke-{tahun_temu:.0f}**. Pada titik ini, nilai aset Anda sudah lebih besar daripada sisa hutang bank Anda, sehingga secara teknikal Anda sudah bisa melunasi seluruh hutang tersebut menggunakan aset investasi jika diperlukan.")
     else:
-        st.warning("Dengan parameter saat ini, garis investasi belum berhasil memotong garis akumulasi pinjaman hingga akhir periode. Pertimbangkan untuk mencari instrumen dengan dividen lebih tinggi atau mempercepat tenor.")
+        st.warning("Dengan parameter saat ini, nilai aset Anda belum berhasil melampaui sisa hutang hingga akhir periode simulasi.")
