@@ -28,7 +28,6 @@ tab1, tab2, tab3 = st.tabs(["Kalkulator Pinjaman Institusi", "Simulasi Investasi
 with tab1:
     st.header(":orange[Kalkulator Pinjaman Berbasis Data Pasar]")
     col1, col2 = st.columns([1, 3])
-    
     with col1:
         kategori_bank = st.selectbox("Pilih Institusi Perbankan", list(db_bank.keys()))
         jenis_kredit = st.selectbox("Jenis Fasilitas Kredit", list(db_bank[kategori_bank].keys()))
@@ -55,7 +54,6 @@ with tab1:
             else:
                 bunga_bln = bunga_tetap / 100 / 12
                 cicilan = (plafon * (bunga_bln * (1 + bunga_bln)**tenor_bulan) / ((1 + bunga_bln)**tenor_bulan - 1)) if bunga_bln > 0 else plafon/tenor_bulan
-            
             porsi_bunga = saldo * bunga_bln
             porsi_pokok = cicilan - porsi_bunga
             saldo -= porsi_pokok
@@ -91,23 +89,25 @@ with tab2:
 # TAB 3: ANALISIS EKUITAS BERSIH
 # ==========================================
 with tab3:
-    st.header("Analisis Kekayaan Bersih (Aset - Liabilitas)")
-    
+    st.header("Analisis Kekayaan Bersih (Net Worth) & Laba Bersih")
     data_cross = []
     saldo_inv = modal_awal
     total_setor = modal_awal
     
-    for thn in range(1, max(lama_investasi, math.ceil(tenor_bulan / 12)) + 1):
+    max_years = max(lama_investasi, math.ceil(tenor_bulan / 12))
+    
+    for thn in range(1, max_years + 1):
         if thn > 1: saldo_inv += tambahan_tahunan; total_setor += tambahan_tahunan
         saldo_inv *= (1 + dividen_tahun/100)
         
         b_ke = min(thn * 12, tenor_bulan)
+        # Ambil sisa hutang dengan pengecekan aman
         sisa_hutang = df_jadwal.loc[b_ke-1, "Sisa Pinjaman"] if b_ke > 0 else plafon
+        # Akumulasi cicilan
         akum_cicilan = df_jadwal.head(b_ke)["Total Angsuran"].sum()
         
         net_asset = max(0, saldo_inv - sisa_hutang)
         laba_bersih_kas = net_asset - (total_setor + akum_cicilan)
-        
         data_cross.append([thn, saldo_inv, sisa_hutang, net_asset, laba_bersih_kas])
     
     df_cross = pd.DataFrame(data_cross, columns=["Tahun", "Total Aset", "Sisa Hutang", "Net Asset", "Laba Bersih Kas"])
@@ -115,8 +115,7 @@ with tab3:
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=df_cross["Tahun"], y=df_cross["Total Aset"], name="Total Aset"))
     fig.add_trace(go.Scatter(x=df_cross["Tahun"], y=df_cross["Sisa Hutang"], name="Sisa Hutang"))
-    fig.add_trace(go.Scatter(x=df_cross["Tahun"], y=df_cross["Net Asset"], name="Net Asset (Ekuitas)", line=dict(dash='dot')))
+    fig.add_trace(go.Scatter(x=df_cross["Tahun"], y=df_cross["Net Asset"], name="Net Asset", line=dict(dash='dot')))
     fig.add_trace(go.Scatter(x=df_cross["Tahun"], y=df_cross["Laba Bersih Kas"], name="Laba Bersih Kas", line=dict(width=4)))
-    
     fig.add_hline(y=0, line_dash="solid", line_color="white")
     st.plotly_chart(fig, use_container_width=True)
