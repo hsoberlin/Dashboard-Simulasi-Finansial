@@ -179,18 +179,25 @@ with tab3:
         fig.update_layout(template="plotly_dark", height=500, hovermode="x unified", margin=dict(l=0, r=0, t=30, b=0))
         st.plotly_chart(fig, use_container_width=True)
         
-        # Keterangan untuk Investor
-        st.subheader("Catatan untuk Calon Investor")
-        st.info("""
-        **Analisis Keamanan Modal (Capital Protection):**
-        Grafik di atas menunjukkan titik *break-even* strategis di mana **Total Nilai Aset** melampaui **Total Uang Terbakar**. Setelah titik ini, proyek memiliki *cushion* nilai yang terus membesar.
-        
-        **Strategi Pelunasan (Risk-Free Payoff):**
-        Persilangan antara **Margin Keuntungan** (Biru) dan **Sisa Hutang** (Merah) adalah momen di mana proyek secara mandiri sanggup melunasi seluruh kewajiban bank tanpa perlu menyentuh **Modal Pokok Investasi**.
-        
-        **Kesimpulan:**
-        Proyek ini dirancang untuk mencapai kemandirian finansial dalam jangka menengah, dengan rasio pertumbuhan aset yang secara sistematis menekan biaya bunga dan risiko kredit.
-        """)
+        # --- LOGIKA NARASI DINAMIS ---
+    df['Selisih_Aset_Terbakar'] = df['Total Aset'] - df['Total Uang Terbakar']
+    df['Selisih_Margin_Hutang'] = df['Margin Keuntungan'] - df['Sisa Hutang']
+    
+    # Mencari tahun break-even
+    be_aset = df[df['Selisih_Aset_Terbakar'] > 0]
+    thn_be_aset = be_aset.iloc[0]['Tahun'] if not be_aset.empty else "di luar periode simulasi"
+    
+    # Mencari tahun pelunasan dari margin
+    be_margin = df[df['Selisih_Margin_Hutang'] > 0]
+    thn_be_margin = be_margin.iloc[0]['Tahun'] if not be_margin.empty else "di luar periode simulasi"
+
+    # --- NARASI DYNAMIC INVESTOR PITCH ---
+    st.subheader("Data-Driven Executive Summary")
+    st.markdown(f"""
+    * **Capital Protection:** Berdasarkan simulasi, nilai portofolio Anda diproyeksikan akan melampaui total kumulatif dana yang dibakar (Cicilan + Modal) pada **Tahun ke-{thn_be_aset}**. Ini adalah titik krusial di mana investasi Anda mulai memiliki *buffer* nilai yang positif.
+    * **Risk-Free Exit Strategy:** Proyek ini memiliki kapasitas untuk melunasi seluruh sisa pokok hutang secara mandiri menggunakan akumulasi profit pada **Tahun ke-{thn_be_margin}**. Pada titik ini, Anda dapat menutup kewajiban perbankan tanpa mengurangi ekuitas modal utama.
+    * **Financial Resilience:** Rasio pertumbuhan aset terhadap beban bunga menunjukkan tren yang sehat, di mana laju *compounding* aset secara konsisten menekan porsi sisa pokok hutang, meminimalisir eksposur risiko kredit Anda dari tahun ke tahun.
+    """)
         
     except Exception as e:
         st.error("Silakan lengkapi input pada 'Kalkulator Pinjaman' (Tab 1) terlebih dahulu untuk memuat data analisis.")
