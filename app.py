@@ -104,35 +104,19 @@ with tab1:
                 data_jadwal.append([bulan, cicilan_saat_ini, porsi_pokok, porsi_bunga, max(0, saldo)])
                 
         # Konversi ke DataFrame
-        df_jadwal = pd.DataFrame(
-            data_jadwal,
-            columns=["Bulan", "Total Angsuran", "Porsi Pokok", "Porsi Bunga", "Sisa Pinjaman"]
-        )
+df_jadwal = pd.DataFrame(
+    data_jadwal,
+    columns=["Bulan", "Total Angsuran", "Porsi Pokok", "Porsi Bunga", "Sisa Pinjaman"]
+)
 
-        # Ringkasan Total Pembayaran Pinjaman
-        total_bayar_hutang = df_jadwal["Total Angsuran"].sum()
-        total_bunga = df_jadwal["Porsi Bunga"].sum()
-
+# Total pembayaran pinjaman
+total_bayar_hutang = df_jadwal["Total Angsuran"].sum()
+total_bunga = df_jadwal["Porsi Bunga"].sum()
+        
         # Visualisasi Grafik
         fig_pinjaman = go.Figure()
-
-        fig_pinjaman.add_trace(
-            go.Bar(
-                x=df_jadwal["Bulan"],
-                y=df_jadwal["Porsi Pokok"],
-                name="Porsi Pokok",
-                marker_color='#00CC96'
-            )
-        )
-
-        fig_pinjaman.add_trace(
-            go.Bar(
-                x=df_jadwal["Bulan"],
-                y=df_jadwal["Porsi Bunga"],
-                name="Porsi Bunga",
-                marker_color='#EF553B'
-            )
-        )
+        fig_pinjaman.add_trace(go.Bar(x=df_jadwal["Bulan"], y=df_jadwal["Porsi Pokok"], name="Porsi Pokok", marker_color='#00CC96')) 
+        fig_pinjaman.add_trace(go.Bar(x=df_jadwal["Bulan"], y=df_jadwal["Porsi Bunga"], name="Porsi Bunga", marker_color='#EF553B')) 
         
         # Tambahan garis bantu untuk menyoroti perubahan cicilan jika floating
         if data_kredit["tipe"] == "floating":
@@ -147,26 +131,24 @@ with tab1:
             template="plotly_dark",
             margin=dict(l=0, r=0, t=40, b=0)
         )
-
         st.plotly_chart(fig_pinjaman, use_container_width=True)
+col_a, col_b = st.columns(2)
 
-        with st.expander("Ringkasan Pembayaran Sampai Lunas"):
-            col_a, col_b = st.columns(2)
+with col_a:
+    st.metric(
+        "Total Bayar Sampai Lunas",
+        f"Rp {total_bayar_hutang:,.0f}"
+    )
 
-            with col_a:
-                st.metric(
-                    "Total Bayar Sampai Lunas",
-                    f"Rp {total_bayar_hutang:,.0f}"
-                )
-
-            with col_b:
-                st.metric(
-                    "Total Bunga Dibayar",
-                    f"Rp {total_bunga:,.0f}"
-                )
-
+with col_b:
+    st.metric(
+        "Total Bunga Dibayar",
+        f"Rp {total_bunga:,.0f}"
+    )
+        
     with st.expander("Tampilkan Tabel Detail Amortisasi"):
         st.dataframe(df_jadwal.style.format("{:,.0f}"))
+
 # ==========================================
 # TAB 2: SIMULASI BUNGA MAJEMUK
 # ==========================================
@@ -215,9 +197,10 @@ with tab2:
             template="plotly_dark",
             margin=dict(l=0, r=0, t=40, b=0)
         )
-        st.plotly_chart(fig_pinjaman, use_container_width=True)
-    with st.expander("Tampilkan Tabel Detail Amortisasi"):
-        st.dataframe(df_jadwal.style.format("{:,.0f}"))
+        st.plotly_chart(fig_invest, use_container_width=True)
+
+    with st.expander("Tampilkan Tabel Detail Pertumbuhan"):
+        st.dataframe(df_invest.style.format("{:,.0f}"))
 
 # ==========================================
 # TAB 3: ANALISIS TITIK TEMU (CROSSOVER) FINAL
