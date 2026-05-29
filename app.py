@@ -108,6 +108,19 @@ with tab1:
             st.plotly_chart(fig_pinjaman, use_container_width=True)
         else:
             st.error("Data jadwal pinjaman kosong, grafik tidak dapat dimuat.")
+            # --- RINGKASAN DATA UNTUK DITAMPILKAN ---
+        st.markdown("---")
+        st.subheader("Ringkasan Eksekutif Pinjaman")
+        
+        # Menggunakan kolom agar terlihat rapi dan profesional
+        k1, k2, k3 = st.columns(3)
+        k1.metric("Total Pembayaran", f"Rp {total_pembayaran_kredit:,.0f}")
+        k2.metric("Total Bunga", f"Rp {total_beban_bunga:,.0f}")
+        k3.metric("Total Pokok", f"Rp {plafon:,.0f}")
+        
+        # Tabel rincian yang bisa dibuka/tutup
+        with st.expander("Klik untuk melihat detail cicilan bulanan"):
+            st.dataframe(df_jadwal.style.format("Rp {:,.0f}"), use_container_width=True)
 # ==========================================
 # TAB 2: SIMULASI INVESTASI BERTAHAP
 # ==========================================
