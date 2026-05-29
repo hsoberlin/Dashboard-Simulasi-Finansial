@@ -55,12 +55,11 @@ with tab1:
         data_jadwal = []
         cicilan_saat_ini = 0
         
-        # Logika Perhitungan Amortisasi (Fixed vs Floating)
+        # Logika Perhitungan Amortisasi
         if data_kredit["tipe"] == "floating":
             for bulan in range(1, tenor_bulan + 1):
                 sisa_tenor = tenor_bulan - bulan + 1
                 
-                # Fase Promo
                 if bulan <= masa_promo_bln:
                     bunga_bln = (bunga_promo / 100) / 12
                     if bulan == 1:
@@ -69,8 +68,6 @@ with tab1:
                         else:
                             cicilan_tetap = saldo / sisa_tenor
                     cicilan_saat_ini = cicilan_tetap
-                
-                # Fase Floating (Rekalkulasi)
                 else:
                     bunga_bln = (bunga_floating / 100) / 12
                     if bulan == masa_promo_bln + 1:
@@ -86,7 +83,7 @@ with tab1:
                 data_jadwal.append([bulan, cicilan_saat_ini, porsi_pokok, porsi_bunga, max(0, saldo)])
                 
             st.subheader(f"Estimasi Cicilan Promo: :green[Rp {cicilan_tetap:,.0f}] / bulan")
-            st.subheader(f"Estimasi Cicilan Floating (Bulan ke-{masa_promo_bln + 1}): :red[Rp {cicilan_floating:,.0f}] / bulan")
+            st.subheader(f"Estimasi Cicilan Floating: :red[Rp {cicilan_floating:,.0f}] / bulan")
             
         else:
             bunga_bln = (bunga_tetap / 100) / 12
@@ -106,12 +103,21 @@ with tab1:
         # Konversi ke DataFrame
         df_jadwal = pd.DataFrame(data_jadwal, columns=["Bulan", "Total Angsuran", "Porsi Pokok", "Porsi Bunga", "Sisa Pinjaman"])
         
+        # --- PENAMBAHAN METRIK TOTAL PEMBAYARAN ---
+        st.markdown("---")
+        total_bayar = df_jadwal["Total Angsuran"].sum()
+        total_bunga = df_jadwal["Porsi Bunga"].sum()
+        
+        col_m1, col_m2 = st.columns(2)
+        col_m1.metric("Total Pembayaran (Pokok + Bunga)", f"Rp {total_bayar:,.0f}")
+        col_m2.metric("Total Bunga Dibayar", f"Rp {total_bunga:,.0f}")
+        st.markdown("---")
+        
         # Visualisasi Grafik
         fig_pinjaman = go.Figure()
         fig_pinjaman.add_trace(go.Bar(x=df_jadwal["Bulan"], y=df_jadwal["Porsi Pokok"], name="Porsi Pokok", marker_color='#00CC96')) 
         fig_pinjaman.add_trace(go.Bar(x=df_jadwal["Bulan"], y=df_jadwal["Porsi Bunga"], name="Porsi Bunga", marker_color='#EF553B')) 
         
-        # Tambahan garis bantu untuk menyoroti perubahan cicilan jika floating
         if data_kredit["tipe"] == "floating":
             fig_pinjaman.add_vline(x=masa_promo_bln, line_width=2, line_dash="dash", line_color="white", annotation_text="Akhir Promo", annotation_position="top right")
 
@@ -140,8 +146,8 @@ with tab2:
     with col3:
         st.subheader("Parameter Investasi")
         modal_awal = st.number_input("Modal Awal (Rp)", min_value=0, value=1000000000, step=1000000, format="%d", key="modal_dividen")
-        tambahan_tahunan = st.number_input("Suntikan Dana per Tahun (Mulai Thn ke-2)", min_value=0, value=0, step=10000000, format="%d")
-        dividen_tahun = st.number_input("Target Pertumbuhan Tahunan (%)", min_value=1.0, value=7.0, step=0.1, format="%.1f")
+        tambahan_tahunan = st.number_input("Suntikan Dana per Tahun (Mulai Thn ke-2)", min_value=0, value=0, step=10000000, format="%d", key="topup_tahunan")
+        dividen_tahun = st.number_input("Target Pertumbuhan Tahunan (%)", min_value=1.0, value=7.0, step=0.1, format="%.1f", key="growth_tahunan")
         lama_investasi = st.slider("Lama Investasi (Tahun)", min_value=1, max_value=50, value=20, step=1)
         
     with col4:
@@ -186,8 +192,8 @@ with tab2:
 # TAB 3: ANALISIS TITIK TEMU (CROSSOVER) FINAL
 # ==========================================
 with tab3:
-    st.header("Analisis Ekuitas: Nilai Aset vs Liabilitas vs Laba Bersih")
-    st.write("Grafik ini memetakan pertumbuhan Total Aset, Sisa Hutang, Net Asset, serta Laba Bersih Kas (Pure Profit) setelah dikurangi seluruh pengeluaran kas aktual (modal investasi dan cicilan).")
+    st.header("Analisis Ekuitas & Profitabilitas Murni")
+    st.write("Visualisasi dipisah menjadi dua grafik untuk membedakan skala triliunan (Aset/Hutang) dan skala margin (Laba Bersih Kas).")
     
     max_tahun = max(lama_investasi, math.ceil(tenor_bulan / 12))
     data_cross = []
@@ -212,13 +218,11 @@ with tab3:
         bulan_berjalan = thn * 12
         batas_bulan = min(bulan_berjalan, tenor_bulan)
         
-        # Mengambil akumulasi cicilan aman tanpa IndexError
         if batas_bulan > 0:
             akumulasi_cicilan_cross = df_jadwal.head(batas_bulan)["Total Angsuran"].sum()
         else:
             akumulasi_cicilan_cross = 0
 
-        # Mengambil Sisa Hutang
         if bulan_berjalan > tenor_bulan:
             sisa_hutang = 0
         else:
@@ -227,42 +231,51 @@ with tab3:
         # 3. Net Asset (Aset - Hutang)
         net_asset = max(0, nilai_aset - sisa_hutang)
         
-        # 4. Sunk Cost (Total uang yang dibakar: Modal Disetor + Cicilan Bank)
+        # 4. Sunk Cost
         sunk_cost = total_modal_disetor_cross + akumulasi_cicilan_cross
         
-        # 5. Pure Profit (Laba Bersih Kas: Net Asset - Sunk Cost)
+        # 5. Pure Profit
         pure_profit = net_asset - sunk_cost
         
         data_cross.append([thn, nilai_aset, sisa_hutang, net_asset, pure_profit])
         
     df_cross = pd.DataFrame(data_cross, columns=["Tahun", "Nilai Aset", "Sisa Hutang", "Net Asset", "Laba Bersih Kas"])
     
-    fig_cross = go.Figure()
+    # --- GRAFIK 1: ASET VS HUTANG (Skala Besar) ---
+    fig_aset = go.Figure()
+    fig_aset.add_trace(go.Scatter(x=df_cross["Tahun"], y=df_cross["Nilai Aset"], name="Total Aset", line=dict(color='#00CC96', width=3)))
+    fig_aset.add_trace(go.Scatter(x=df_cross["Tahun"], y=df_cross["Sisa Hutang"], name="Sisa Hutang", line=dict(color='#EF553B', width=3)))
+    fig_aset.add_trace(go.Scatter(x=df_cross["Tahun"], y=df_cross["Net Asset"], name="Net Asset (Ekuitas)", line=dict(color='#19D3F3', width=3, dash='dot')))
     
-    fig_cross.add_trace(go.Scatter(x=df_cross["Tahun"], y=df_cross["Nilai Aset"], name="Total Aset", line=dict(color='#00CC96', width=3)))
-    fig_cross.add_trace(go.Scatter(x=df_cross["Tahun"], y=df_cross["Sisa Hutang"], name="Sisa Hutang", line=dict(color='#EF553B', width=3)))
-    fig_cross.add_trace(go.Scatter(x=df_cross["Tahun"], y=df_cross["Net Asset"], name="Net Asset (Ekuitas)", line=dict(color='#19D3F3', width=4, dash='dot')))
-    fig_cross.add_trace(go.Scatter(x=df_cross["Tahun"], y=df_cross["Laba Bersih Kas"], name="Laba Bersih Kas", line=dict(color='#FFB703', width=4)))
-    
-    fig_cross.add_hline(y=0, line_width=1, line_dash="solid", line_color="white")
-    
-    fig_cross.update_layout(
-        title="Kurva Kekayaan Bersih dan Break-Even Kas",
+    fig_aset.update_layout(
+        title="Posisi Aset vs Liabilitas",
         xaxis_title="Tahun Ke-",
         yaxis_title="Nominal (Rp)",
         hovermode="x unified",
         template="plotly_dark",
-        margin=dict(l=0, r=0, t=40, b=0),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        margin=dict(l=0, r=0, t=40, b=0)
     )
+    st.plotly_chart(fig_aset, use_container_width=True)
     
-    st.plotly_chart(fig_cross, use_container_width=True)
+    # --- GRAFIK 2: LABA BERSIH KAS (Skala Detail) ---
+    fig_profit = go.Figure()
+    fig_profit.add_trace(go.Scatter(x=df_cross["Tahun"], y=df_cross["Laba Bersih Kas"], name="Laba Bersih Kas", line=dict(color='#FFB703', width=4)))
+    fig_profit.add_hline(y=0, line_width=1, line_dash="solid", line_color="white")
     
-    # Analisis Break-Even Kas Otomatis
+    fig_profit.update_layout(
+        title="Laba Bersih Kas (Pure Profit / Absolute Break-Even)",
+        xaxis_title="Tahun Ke-",
+        yaxis_title="Nominal Laba (Rp)",
+        hovermode="x unified",
+        template="plotly_dark",
+        margin=dict(l=0, r=0, t=40, b=0)
+    )
+    st.plotly_chart(fig_profit, use_container_width=True)
+    
+    # Analisis Break-Even
     titik_breakeven = df_cross[df_cross['Laba Bersih Kas'] > 0]
-    
     if not titik_breakeven.empty:
         tahun_be = titik_breakeven.iloc[0]['Tahun']
-        st.info(f"Portofolio mencapai Absolute Break-Even pada Tahun ke-{tahun_be:.0f}. Pada titik ini, pertumbuhan aset telah menutupi seluruh uang kas aktual yang dikeluarkan (Sunk Cost).")
+        st.success(f"Portofolio mencapai Absolute Break-Even pada **Tahun ke-{tahun_be:.0f}**. Pada titik ini, pertumbuhan aset telah menutupi seluruh uang kas aktual yang dikeluarkan (Sunk Cost).")
     else:
         st.warning("Laba Bersih Kas belum menembus angka positif hingga akhir periode simulasi. Secara akumulasi, uang yang dibakar masih lebih tinggi dari nilai Net Asset.")
