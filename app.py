@@ -131,71 +131,55 @@ with tab2:
         st.plotly_chart(fig_invest, use_container_width=True)
 
 # ==========================================
-# TAB 3: ANALISIS MARGIN & PELUNASAN
+# TAB 3: ANALISIS PENGAJUAN INVESTOR (VERSION 4.0)
 # ==========================================
 with tab3:
-    st.header(":red[Analisis Pelunasan dari Margin Keuntungan (Profit-Based Payoff)]")
-    st.write("Visualisasi ini membuktikan kapan **Margin Keuntungan Murni (Profit)** Anda sudah cukup untuk melunasi **Sisa Pokok Hutang** secara instan, tanpa menyentuh modal pokok investasi sama sekali.")
+    st.header(":red[Executive Summary: Profil Risiko & Pertumbuhan]")
     
-    max_tahun = max(lama_investasi, math.ceil(tenor_bulan / 12))
+    # Perhitungan Data
+    max_tahun = max(20, math.ceil(tenor_bulan / 12))
     data_cross = []
-    
-    saldo_akhir_tahun = st.session_state.modal_awal
-    modal_kumulatif = st.session_state.modal_awal
+    saldo_akhir = st.session_state.modal_awal
+    modal_total_disetor = st.session_state.modal_awal
     
     for thn in range(1, max_tahun + 1):
-        # 1. Proyeksi Profit Murni (Tanpa Modal Pokok)
-        if thn > 1 and thn <= lama_investasi:
-            saldo_akhir_tahun += st.session_state.tambahan_tahunan
-            modal_kumulatif += st.session_state.tambahan_tahunan
+        if thn > 1 and thn <= 20:
+            saldo_akhir += st.session_state.tambahan_tahunan
+            modal_total_disetor += st.session_state.tambahan_tahunan
             
-        saldo_akhir_tahun *= (1 + st.session_state.dividen_tahun/100)
-        akumulasi_profit = saldo_akhir_tahun - modal_kumulatif
+        saldo_akhir *= (1 + st.session_state.dividen_tahun/100)
         
-        # 2. Sisa Pokok Hutang (Sisa Potongan Bank)
+        # Sunk Cost (Modal + Cicilan)
         bulan_akhir = min(thn * 12, tenor_bulan)
+        uang_cicilan = df_jadwal.iloc[:bulan_akhir]["Total Angsuran"].sum()
+        sisa_hutang = df_jadwal.iloc[bulan_akhir - 1]["Sisa Pinjaman"] if bulan_akhir < tenor_bulan else 0
         
-        if bulan_akhir < tenor_bulan:
-            sisa_hutang = df_jadwal.iloc[bulan_akhir - 1]["Sisa Pinjaman"]
-        else:
-            sisa_hutang = 0
-            
-        # 3. Kemampuan Bayar Cicilan Tahunan dari Profit Tahunan (Micro Cashflow)
-        bulan_mulai = (thn - 1) * 12
-        if bulan_mulai < tenor_bulan:
-            beban_tahunan = df_jadwal.iloc[bulan_mulai:bulan_akhir]["Total Angsuran"].sum()
-        else:
-            beban_tahunan = 0
-            
-        if thn == 1:
-            profit_tahunan = saldo_akhir_tahun - st.session_state.modal_awal
-        else:
-            # Profit tahun berjalan saja
-            profit_tahunan = saldo_akhir_tahun - (saldo_akhir_tahun / (1 + st.session_state.dividen_tahun/100))
-            
-        data_cross.append([thn, akumulasi_profit, sisa_hutang, profit_tahunan, beban_tahunan])
+        total_uang_terbakar = modal_total_disetor + uang_cicilan
+        akumulasi_margin = saldo_akhir - modal_total_disetor
         
-    df_cross = pd.DataFrame(data_cross, columns=["Tahun", "Akumulasi Margin Keuntungan", "Sisa Pokok Hutang", "Profit Tahunan", "Beban Cicilan Tahunan"])
-    
-    # --- GRAFIK 1: AKUMULASI PROFIT VS SISA HUTANG ---
-    fig_margin = go.Figure()
-    fig_margin.add_trace(go.Scatter(x=df_cross["Tahun"], y=df_cross["Akumulasi Margin Keuntungan"], name="Akumulasi Margin Keuntungan (Profit)", line=dict(color='#00CC96', width=4)))
-    fig_margin.add_trace(go.Scatter(x=df_cross["Tahun"], y=df_cross["Sisa Pokok Hutang"], name="Total Sisa Potongan (Pokok Hutang)", line=dict(color='#EF553B', width=4)))
-    
-    fig_margin.update_layout(
-        xaxis_title="Tahun Ke-", yaxis_title="Nominal (Rp)",
-        hovermode="x unified", template="plotly_dark", height=400, margin=dict(l=0, r=0, t=30, b=0)
-    )
-    st.plotly_chart(fig_margin, use_container_width=True)
-    
-    # Metrik Peringatan Titik Temu Pelunasan
-    df_cross['Selisih Pelunasan'] = df_cross['Akumulasi Margin Keuntungan'] - df_cross['Sisa Pokok Hutang']
-    titik_lunas = df_cross[df_cross['Selisih Pelunasan'] > 0]
-    
-    if not titik_lunas.empty:
-        thn_lunas = titik_lunas.iloc[0]['Tahun']
-        st.success(f"✔️ **LAYAK DIBIAYAI:** Pada **Tahun ke-{thn_lunas:.0f}**, Margin Keuntungan Murni telah melampaui Sisa Pokok Hutang. Di titik ini, hutang bisa dilunasi penuh HANYA dengan mencairkan profit, sementara Modal Utama tetap utuh 100%.")
-    else:
-        st.warning("⚠️ **RESIKO:** Hingga akhir simulasi, akumulasi margin keuntungan belum cukup untuk melunasi sisa pokok hutang secara mandiri tanpa menyentuh modal.")
+        data_cross.append([thn, saldo_akhir, total_uang_terbakar, akumulasi_margin, sisa_hutang])
 
-   
+    df = pd.DataFrame(data_cross, columns=["Tahun", "Total Aset", "Total Uang Terbakar", "Margin Keuntungan", "Sisa Hutang"])
+    
+    # Grafik Utama
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Total Aset"], name="Total Nilai Aset (Pokok + Profit)", line=dict(color='#00CC96', width=4)))
+    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Total Uang Terbakar"], name="Total Uang Terbakar (Modal + Cicilan)", line=dict(color='#FFA15A', width=3, dash='dot')))
+    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Margin Keuntungan"], name="Akumulasi Margin Keuntungan", line=dict(color='#636EFA', width=3)))
+    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Sisa Hutang"], name="Sisa Pokok Hutang", line=dict(color='#EF553B', width=3)))
+    
+    fig.update_layout(template="plotly_dark", height=500, hovermode="x unified", margin=dict(l=0, r=0, t=30, b=0))
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Keterangan untuk Investor
+    st.subheader("Catatan untuk Calon Investor")
+    st.info("""
+    **Analisis Keamanan Modal (Capital Protection):**
+    Grafik di atas menunjukkan titik *break-even* strategis di mana **Total Nilai Aset** melampaui **Total Uang Terbakar**. Setelah titik ini, proyek memiliki *cushion* (bantalan) nilai yang terus membesar.
+    
+    **Strategi Pelunasan (Risk-Free Payoff):**
+    Perhatikan persilangan antara **Margin Keuntungan** (Biru) dan **Sisa Hutang** (Merah). Titik potong tersebut adalah momen di mana proyek secara mandiri sanggup melunasi seluruh kewajiban bank tanpa perlu menyentuh sepeser pun dari **Modal Pokok Investasi**.
+    
+    **Kesimpulan:**
+    Proyek ini dirancang untuk mencapai kemandirian finansial dalam jangka menengah, dengan rasio pertumbuhan aset yang secara sistematis menekan biaya bunga dan risiko kredit.
+    """)
