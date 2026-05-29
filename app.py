@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import math
 
 st.set_page_config(page_title="Dashboard Finansial", layout="wide")
@@ -37,10 +38,10 @@ with tab1:
             masa_promo_bln = masa_promo_thn * 12
 
     with col2:
-        # Kalkulasi Data
         saldo = plafon
         data_jadwal = []
         
+        # Logika fixed installment per fase perbankan
         if tipe_bunga == "Floating":
             b_promo = (bunga_promo / 100) / 12
             cicilan_promo = (plafon * (b_promo * (1 + b_promo)**tenor_bulan) / ((1 + b_promo)**tenor_bulan - 1)) if b_promo > 0 else plafon/tenor_bulan
@@ -75,19 +76,46 @@ with tab1:
         total_pembayaran = df_jadwal["Total Angsuran"].sum()
         total_bunga = df_jadwal["Porsi Bunga"].sum()
         
-        # Output Nilai Utama
         st.subheader("Ringkasan Kewajiban")
         m1, m2 = st.columns(2)
         m3, m4 = st.columns(2)
         
-        m1.metric("1. Nilai Bayar Per Bulan (Angsuran)", f"Rp {df_jadwal.iloc[0]['Total Angsuran']:,.0f}")
-        m2.metric("2. Total Bayar Hutang Sampai Lunas", f"Rp {total_pembayaran:,.0f}")
+        m1.metric("1. Nilai Bayar Per Bulan", f"Rp {df_jadwal.iloc[0]['Total Angsuran']:,.0f}")
+        m2.metric("2. Total Bayar Hutang Lunas", f"Rp {total_pembayaran:,.0f}")
         m3.metric("3. Total Pokok Hutang", f"Rp {plafon:,.0f}")
         m4.metric("4. Total Beban Bunga", f"Rp {total_bunga:,.0f}")
         
         st.markdown("---")
-        st.write("Tabel Rincian Pembayaran Per Bulan")
-        st.dataframe(df_jadwal.style.format("Rp {:,.0f}"), use_container_width=True, height=250)
+        
+        # Dual-Axis Chart
+        fig_pinjaman = make_subplots(specs=[[{"secondary_y": True}]])
+        
+        fig_pinjaman.add_trace(
+            go.Bar(x=df_jadwal["Bulan"], y=df_jadwal["Porsi Pokok"], name="Porsi Pokok", marker_color='#00CC96', marker_line_width=0),
+            secondary_y=False
+        )
+        fig_pinjaman.add_trace(
+            go.Bar(x=df_jadwal["Bulan"], y=df_jadwal["Porsi Bunga"], name="Porsi Bunga", marker_color='#EF553B', marker_line_width=0),
+            secondary_y=False
+        )
+        fig_pinjaman.add_trace(
+            go.Scatter(x=df_jadwal["Bulan"], y=df_jadwal["Sisa Pinjaman"], name="Sisa Pokok Hutang", mode='lines', line=dict(color='#636EFA', width=3)),
+            secondary_y=True
+        )
+        
+        fig_pinjaman.update_layout(
+            title="Komposisi Angsuran & Penurunan Pokok Hutang",
+            barmode='stack', bargap=0, template="plotly_dark", 
+            height=450, hovermode="x unified", margin=dict(l=0, r=0, t=40, b=0),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+        fig_pinjaman.update_yaxes(title_text="Nominal Cicilan (Rp)", secondary_y=False, showgrid=False)
+        fig_pinjaman.update_yaxes(title_text="Sisa Hutang (Rp)", secondary_y=True, showgrid=True, gridcolor='rgba(255,255,255,0.1)')
+        
+        st.plotly_chart(fig_pinjaman, use_container_width=True)
+
+        with st.expander("Tampilkan Tabel Detail Rincian Pembayaran Per Bulan"):
+            st.dataframe(df_jadwal.style.format("Rp {:,.0f}"), use_container_width=True, height=250)
 
 # ==========================================
 # TAB 2: SIMULASI INVESTASI
@@ -128,7 +156,7 @@ with tab2:
 # TAB 3: ANALISIS LEVERAGE
 # ==========================================
 with tab3:
-    st.header("Executive Summary: Profil Risiko & Pertumbuhan")
+    st.header("Analisis Profil Risiko & Kekuatan Margin")
     
     max_tahun = max(math.ceil(tenor_bulan / 12), st.session_state.lama_investasi)
     data_cross = []
@@ -145,7 +173,7 @@ with tab3:
         uang_cicilan = df_jadwal.iloc[:bulan_akhir]["Total Angsuran"].sum()
         sisa_hutang = df_jadwal.iloc[bulan_akhir - 1]["Sisa Pinjaman"] if bulan_akhir < tenor_bulan else 0
         
-        total_uang_terbakar = modal_total_disetor + uang_cicilan
+        total_uang_terbakar = uang_cicilan
         akumulasi_margin = saldo_akhir - modal_total_disetor
         
         data_cross.append([thn, saldo_akhir, total_uang_terbakar, akumulasi_margin, sisa_hutang])
@@ -156,20 +184,25 @@ with tab3:
     df['Selisih_Margin_Hutang'] = df['Margin Keuntungan'] - df['Sisa Hutang']
     
     be_aset = df[df['Selisih_Aset_Terbakar'] > 0]
-    thn_be_aset = be_aset.iloc[0]['Tahun'] if not be_aset.empty else "N/A"
+    thn_be_aset = be_aset.iloc[0]['Tahun'] if not be_aset.empty else "N/A (Di Luar Simulasi)"
     
     be_margin = df[df['Selisih_Margin_Hutang'] > 0]
-    thn_be_margin = be_margin.iloc[0]['Tahun'] if not be_margin.empty else "N/A"
+    thn_be_margin = be_margin.iloc[0]['Tahun'] if not be_margin.empty else "N/A (Di Luar Simulasi)"
 
-    st.write("Data-Driven Executive Summary")
-    st.write(f"- Capital Protection: Nilai portofolio melampaui dana yang dibakar pada Tahun ke-{thn_be_aset}.")
-    st.write(f"- Risk-Free Exit: Kapasitas melunasi pokok hutang menggunakan akumulasi margin tercapai pada Tahun ke-{thn_be_margin}.")
+    st.subheader("Keterangan Strategis Pembiayaan Proyek (Investor Brief)")
+    st.markdown(f"""
+    * **Efisiensi Leverage (Asset vs Cost of Leverage):** Laju pertumbuhan **Total Nilai Aset** diproyeksikan melampaui seluruh biaya akumulasi angsuran yang dibakar ke bank pada **Tahun ke-{thn_be_aset}**. Titik ini memastikan seluruh ongkos modal tertutupi secara fundamental.
+    * **Strategi Pelunasan Tanpa Risiko (Risk-Free Payoff):** Pada **Tahun ke-{thn_be_margin}**, posisi **Margin Keuntungan Murni** memotong garis **Sisa Pokok Hutang**. Kondisi ini membuktikan bahwa strategi ini mampu melunasi seluruh sisa hutang perbankan menggunakan profit berjalan murni, tanpa mengganggu likuiditas ekuitas awal.
+    """)
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Total Aset"], name="Total Nilai Aset", line=dict(color='#00CC96', width=3)))
-    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Total Uang Terbakar"], name="Total Uang Terbakar", line=dict(color='#FFA15A', width=2, dash='dot')))
-    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Margin Keuntungan"], name="Akumulasi Margin", line=dict(color='#636EFA', width=3)))
+    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Total Aset"], name="Total Nilai Aset", line=dict(color='#00CC96', width=3.5)))
+    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Total Uang Terbakar"], name="Total Uang Terbakar (Hanya Cicilan)", line=dict(color='#FFA15A', width=2.5, dash='dash')))
+    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Margin Keuntungan"], name="Margin Keuntungan Murni", line=dict(color='#636EFA', width=3)))
     fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Sisa Hutang"], name="Sisa Pokok Hutang", line=dict(color='#EF553B', width=3)))
     
-    fig.update_layout(template="plotly_dark", height=500, hovermode="x unified", margin=dict(l=0, r=0, t=10, b=0))
+    fig.update_layout(
+        template="plotly_dark", height=520, hovermode="x unified", 
+        margin=dict(l=0, r=0, t=10, b=0), xaxis_title="Tahun Ke-", yaxis_title="Nominal Neraca (Rp)"
+    )
     st.plotly_chart(fig, use_container_width=True)
