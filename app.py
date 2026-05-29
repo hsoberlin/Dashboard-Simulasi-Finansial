@@ -6,32 +6,19 @@ import math
 
 st.set_page_config(page_title="Dashboard Finansial", layout="wide")
 
-# --- CUSTOM CSS UNTUK TEMA GELAP & RESPONSIVE SMARTPHONE ---
+# --- CUSTOM CSS SMARTPHONE (PORTRAIT) & BLACK THEME ---
 st.markdown("""
 <style>
-/* 1. Memaksa Background Menjadi Hitam */
-[data-testid="stAppViewContainer"] {
-    background-color: #000000 !important;
-}
-[data-testid="stHeader"] {
-    background-color: transparent !important;
-}
-
-/* 2. Menyesuaikan Warna Teks Menjadi Terang (Putih/Abu Muda) */
-p, h1, h2, h3, label, li, .stMarkdown, .stMetricLabel {
-    color: #F8F9FA !important;
-}
-
-/* 3. CSS aktif khusus untuk layar HP / ukuran kecil (Portrait) */
+[data-testid="stAppViewContainer"] { background-color: #000000 !important; }
+[data-testid="stHeader"] { background-color: transparent !important; }
+p, h1, h2, h3, label, li, .stMarkdown, .stMetricLabel { color: #F8F9FA !important; }
 @media (max-width: 768px) {
-    h1 { font-size: 1.3rem !important; }
-    h2 { font-size: 1.1rem !important; }
-    h3 { font-size: 1.0rem !important; }
-    p, label, li, .stMarkdown { font-size: 0.85rem !important; }
-    
-    /* Memperkecil ukuran font pada Metric (Kotak Angka Ringkasan) */
-    div[data-testid="stMetricValue"] { font-size: 1.1rem !important; }
-    div[data-testid="stMetricLabel"] { font-size: 0.75rem !important; }
+    h1 { font-size: 1.2rem !important; }
+    h2 { font-size: 1.0rem !important; }
+    h3 { font-size: 0.9rem !important; }
+    p, label, li, .stMarkdown { font-size: 0.8rem !important; }
+    div[data-testid="stMetricValue"] { font-size: 1.0rem !important; }
+    div[data-testid="stMetricLabel"] { font-size: 0.7rem !important; }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -39,23 +26,31 @@ p, h1, h2, h3, label, li, .stMarkdown, .stMetricLabel {
 st.title("Dashboard Simulasi Finansial")
 
 # --- INISIALISASI SESSION STATE ---
-if 'modal_awal' not in st.session_state: st.session_state.modal_awal = 1000000000
+if 'modal_awal' not in st.session_state: st.session_state.modal_awal = 800000000
 if 'tambahan_tahunan' not in st.session_state: st.session_state.tambahan_tahunan = 0
 if 'dividen_tahun' not in st.session_state: st.session_state.dividen_tahun = 7.0
 if 'lama_investasi' not in st.session_state: st.session_state.lama_investasi = 20
+if 'capex' not in st.session_state: st.session_state.capex = 200000000
 
 tab1, tab2, tab3 = st.tabs(["Pinjaman", "Investasi", "Analisis Leverage"])
 
 # ==========================================
-# TAB 1: KALKULATOR PINJAMAN
+# TAB 1: KALKULATOR PINJAMAN & CAPEX
 # ==========================================
 with tab1:
-    st.header("Kalkulator Pinjaman Berbasis Pasar")
+    st.header("Kalkulator Pinjaman & Alokasi Capex")
     col1, col2 = st.columns([1, 2.5])
     
     with col1:
         st.subheader("Parameter")
         plafon = st.number_input("Plafon Pinjaman (Rp)", min_value=0, value=1000000000, step=50000000, format="%d")
+        capex = st.number_input("Alokasi Capex (Laptop, Server, Langganan)", min_value=0, value=st.session_state.capex, step=10000000, format="%d")
+        
+        st.session_state.capex = capex
+        st.session_state.modal_awal = max(0, plafon - capex)
+        
+        st.caption(f"Sisa Modal Kerja Investasi: Rp {st.session_state.modal_awal:,.0f}")
+        
         tenor_bulan = st.slider("Tenor (Bulan)", min_value=12, max_value=360, value=240, step=12)
         tipe_bunga = st.radio("Tipe Bunga", ["Fixed", "Floating"], horizontal=True)
         
@@ -116,7 +111,7 @@ with tab1:
         fig_pinjaman.add_trace(go.Scatter(x=df_jadwal["Bulan"], y=df_jadwal["Sisa Pinjaman"], name="Sisa Hutang", mode='lines', line=dict(color='#636EFA', width=3)), secondary_y=True)
         
         fig_pinjaman.update_layout(
-            barmode='stack', bargap=0, template="plotly_dark", height=400, 
+            barmode='stack', bargap=0, template="plotly_dark", height=380, 
             hovermode="x unified", margin=dict(l=0, r=0, t=10, b=0),
             legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1)
         )
@@ -133,7 +128,7 @@ with tab2:
     col3, col4 = st.columns([1, 2.5])
     
     with col3:
-        st.session_state.modal_awal = st.number_input("Modal Awal (Rp)", value=st.session_state.modal_awal, step=10000000)
+        st.session_state.modal_awal = st.number_input("Modal Awal Investasi (Rp)", value=st.session_state.modal_awal, step=10000000)
         st.session_state.tambahan_tahunan = st.number_input("Suntikan Tahunan (Rp)", value=st.session_state.tambahan_tahunan, step=5000000)
         st.session_state.dividen_tahun = st.number_input("Pertumbuhan (%)", value=st.session_state.dividen_tahun, step=0.1)
         st.session_state.lama_investasi = st.slider("Lama Investasi (Tahun)", 1, 50, st.session_state.lama_investasi)
@@ -156,11 +151,11 @@ with tab2:
         fig_invest = go.Figure()
         fig_invest.add_trace(go.Scatter(x=df_invest["Tahun"], y=df_invest["Modal Disetor"], mode='lines', stackgroup='one', name="Modal Disetor", fillcolor='#19D3F3', line=dict(width=0))) 
         fig_invest.add_trace(go.Scatter(x=df_invest["Tahun"], y=df_invest["Akumulasi Profit"], mode='lines', stackgroup='one', name="Profit", fillcolor='#AB63FA', line=dict(width=0))) 
-        fig_invest.update_layout(template="plotly_dark", height=350, hovermode="x unified", margin=dict(l=0, r=0, t=10, b=0))
+        fig_invest.update_layout(template="plotly_dark", height=320, hovermode="x unified", margin=dict(l=0, r=0, t=10, b=0))
         st.plotly_chart(fig_invest, use_container_width=True)
 
 # ==========================================
-# TAB 3: ANALISIS LEVERAGE (DENGAN NET ASSET)
+# TAB 3: ANALISIS LEVERAGE (DENGAN CAPEX LOGIC)
 # ==========================================
 with tab3:
     st.header("Profil Risiko & Kekuatan Margin")
@@ -180,38 +175,36 @@ with tab3:
         uang_cicilan = df_jadwal.iloc[:bulan_akhir]["Total Angsuran"].sum()
         sisa_hutang = df_jadwal.iloc[bulan_akhir - 1]["Sisa Pinjaman"] if bulan_akhir < tenor_bulan else 0
         
-        total_uang_terbakar = uang_cicilan + modal_total_disetor
-        akumulasi_margin = saldo_akhir - modal_total_disetor
+        # Uang terbakar = Cicilan Bank + Suntikan Tunai Tahunan (Tanpa modal awal karena dibiayai utang bank)
+        total_uang_terbakar = uang_cicilan + (modal_total_disetor - st.session_state.modal_awal)
+        margin_murni = saldo_akhir - modal_total_disetor
         net_asset = saldo_akhir - sisa_hutang
         
-        data_cross.append([thn, saldo_akhir, total_uang_terbakar, akumulasi_margin, sisa_hutang, net_asset])
+        data_cross.append([thn, saldo_akhir, total_uang_terbakar, margin_murni, sisa_hutang, net_asset])
 
-    df = pd.DataFrame(data_cross, columns=["Tahun", "Total Aset", "Total Cash Outflow", "Margin Murni", "Sisa Hutang", "Net Asset"])
+    df = pd.DataFrame(data_cross, columns=["Tahun", "Total Aset", "Total Uang Terbakar", "Margin Murni", "Sisa Hutang", "Net Asset"])
     
-    # Kalkulasi Break-Even
+    # Kalkulasi Titik Kritis
     be_lunas = df[df['Margin Murni'] > df['Sisa Hutang']]
-    teks_lunas = f"✅ :green[**Tahun ke-{int(be_lunas.iloc[0]['Tahun'])}**] - Lunas pakai profit." if not be_lunas.empty else "❌ :red[**Belum Tercapai**]"
+    teks_lunas = f"✅ :green[**Tahun ke-{int(be_lunas.iloc[0]['Tahun'])}**] - Profit sanggup tutup sisa hutang bank." if not be_lunas.empty else "❌ :red[**Belum Tercapai**]"
     
-    be_bakar = df[df['Margin Murni'] > df['Total Cash Outflow']]
-    teks_bakar = f"✅ :green[**Tahun ke-{int(be_bakar.iloc[0]['Tahun'])}**] - Profit kalahkan uang dibakar." if not be_bakar.empty else "❌ :red[**Belum Tercapai**]"
+    be_bakar = df[df['Margin Murni'] > df['Total Uang Terbakar']]
+    teks_bakar = f"✅ :green[**Tahun ke-{int(be_bakar.iloc[0]['Tahun'])}**] - Profit kalahkan semua cicilan & suntikan dana." if not be_bakar.empty else "❌ :red[**Belum Tercapai**]"
 
-    # Teks Dipersingkat & Padat
     st.markdown(f"""
     **1. Kapan margin lunasin sisa hutang?** {teks_lunas}  
-    
     **2. Kapan margin kalahkan uang dibakar?** {teks_bakar}
     """)
 
-    # Grafik Kurva Gabungan
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Total Aset"], name="Total Aset", line=dict(color='#00CC96', width=3)))
     fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Net Asset"], name="Net Asset (Bebas Hutang)", line=dict(color='#FFFFFF', width=3)))
-    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Total Cash Outflow"], name="Total Uang Dibakar", line=dict(color='#FFA15A', width=2, dash='dash')))
+    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Total Uang Terbakar"], name="Total Uang Terbakar", line=dict(color='#FFA15A', width=2, dash='dash')))
     fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Margin Murni"], name="Margin Keuntungan", line=dict(color='#636EFA', width=3)))
     fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Sisa Hutang"], name="Sisa Hutang", line=dict(color='#EF553B', width=3)))
     
     fig.update_layout(
-        template="plotly_dark", height=450, hovermode="x unified", 
+        template="plotly_dark", height=420, hovermode="x unified", 
         margin=dict(l=0, r=0, t=10, b=0),
         legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1)
     )
