@@ -6,16 +6,30 @@ import math
 
 st.set_page_config(page_title="Dashboard Finansial", layout="wide")
 
-# --- CUSTOM CSS UNTUK SMARTPHONE (PORTRAIT) ---
+# --- CUSTOM CSS UNTUK TEMA GELAP & RESPONSIVE SMARTPHONE ---
 st.markdown("""
 <style>
-/* CSS ini aktif untuk layar HP / ukuran kecil */
+/* 1. Memaksa Background Menjadi Hitam */
+[data-testid="stAppViewContainer"] {
+    background-color: #000000 !important;
+}
+[data-testid="stHeader"] {
+    background-color: transparent !important;
+}
+
+/* 2. Menyesuaikan Warna Teks Menjadi Terang (Putih/Abu Muda) */
+p, h1, h2, h3, label, li, .stMarkdown, .stMetricLabel {
+    color: #F8F9FA !important;
+}
+
+/* 3. CSS aktif khusus untuk layar HP / ukuran kecil (Portrait) */
 @media (max-width: 768px) {
     h1 { font-size: 1.3rem !important; }
     h2 { font-size: 1.1rem !important; }
     h3 { font-size: 1.0rem !important; }
-    p, .stMarkdown { font-size: 0.85rem !important; }
-    /* Memperkecil ukuran font pada Metric (Angka Ringkasan) */
+    p, label, li, .stMarkdown { font-size: 0.85rem !important; }
+    
+    /* Memperkecil ukuran font pada Metric (Kotak Angka Ringkasan) */
     div[data-testid="stMetricValue"] { font-size: 1.1rem !important; }
     div[data-testid="stMetricLabel"] { font-size: 0.75rem !important; }
 }
@@ -176,16 +190,16 @@ with tab3:
     
     # Kalkulasi Break-Even
     be_lunas = df[df['Margin Murni'] > df['Sisa Hutang']]
-    teks_lunas = f"✅ :green[**Tahun ke-{int(be_lunas.iloc[0]['Tahun'])}**] - Sisa hutang bisa dilunasi pakai profit berjalan." if not be_lunas.empty else "❌ :red[**Belum Tercapai**]"
+    teks_lunas = f"✅ :green[**Tahun ke-{int(be_lunas.iloc[0]['Tahun'])}**] - Lunas pakai profit." if not be_lunas.empty else "❌ :red[**Belum Tercapai**]"
     
     be_bakar = df[df['Margin Murni'] > df['Total Cash Outflow']]
-    teks_bakar = f"✅ :green[**Tahun ke-{int(be_bakar.iloc[0]['Tahun'])}**] - Profit murni melampaui seluruh modal & cicilan bank." if not be_bakar.empty else "❌ :red[**Belum Tercapai**]"
+    teks_bakar = f"✅ :green[**Tahun ke-{int(be_bakar.iloc[0]['Tahun'])}**] - Profit kalahkan uang dibakar." if not be_bakar.empty else "❌ :red[**Belum Tercapai**]"
 
     # Teks Dipersingkat & Padat
     st.markdown(f"""
-    **1. Kapan margin mampu melunasi sisa pokok hutang?** {teks_lunas}  
+    **1. Kapan margin lunasin sisa hutang?** {teks_lunas}  
     
-    **2. Kapan margin mengalahkan total uang dibakar (Cash Outflow)?** {teks_bakar}
+    **2. Kapan margin kalahkan uang dibakar?** {teks_bakar}
     """)
 
     # Grafik Kurva Gabungan
@@ -194,7 +208,7 @@ with tab3:
     fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Net Asset"], name="Net Asset (Bebas Hutang)", line=dict(color='#FFFFFF', width=3)))
     fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Total Cash Outflow"], name="Total Uang Dibakar", line=dict(color='#FFA15A', width=2, dash='dash')))
     fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Margin Murni"], name="Margin Keuntungan", line=dict(color='#636EFA', width=3)))
-    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Sisa Hutang"], name="Sisa Pokok Hutang", line=dict(color='#EF553B', width=3)))
+    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Sisa Hutang"], name="Sisa Hutang", line=dict(color='#EF553B', width=3)))
     
     fig.update_layout(
         template="plotly_dark", height=450, hovermode="x unified", 
