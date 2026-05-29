@@ -52,49 +52,68 @@ with tab1:
         else:
             bunga_tetap = st.number_input("Suku Bunga Efektif (% p.a)", value=data_kredit["rate"], step=0.01)
             
-    with col2:
-        saldo = plafon
+    saldo = plafon
         data_jadwal = []
+        
+        # --- PERBAIKAN LOGIKA: Hitung cicilan agar tetap (Fixed) per fase ---
+        # Kita hitung cicilan di luar loop agar tidak berubah setiap bulan
+        if data_kredit["tipe"] == "floating":
+            # 1. Hitung Fase Promo
+            b_promo = (bunga_promo / 100) / 12
+            cicilan_promo = (plafon * (b_promo * (1 + b_promo)**tenor_bulan) / ((1 + b_promo)**tenor_bulan - 1)) if b_promo > 0 else plafon/tenor_bulan
+            
+            # 2. Hitung Sisa Saldo di akhir masa promo untuk menentukan cicilan floating
+            saldo_temp = plafon
+            for b in range(1, masa_promo_bln + 1):
+                porsi_bunga_t = saldo_temp * b_promo
+                saldo_temp -= (cicilan_promo - porsi_bunga_t)
+            
+            # 3. Hitung Cicilan Floating (Rekalkulasi sisa tenor)
+            b_float = (bunga_floating / 100) / 12
+            sisa_tenor_float = tenor_bulan - masa_promo_bln
+            cicilan_floating = (saldo_temp * (b_float * (1 + b_float)**sisa_tenor_float) / ((1 + b_float)**sisa_tenor_float - 1)) if b_float > 0 else saldo_temp/sisa_tenor_float
+        else:
+            b_tetap = bunga_tetap / 100 / 12
+            cicilan_tetap = (plafon * (b_tetap * (1 + b_tetap)**tenor_bulan) / ((1 + b_tetap)**tenor_bulan - 1)) if b_tetap > 0 else plafon/tenor_bulan
+
+        # --- LOOP GENERATE JADWAL ---
+        saldo = plafon
         for bulan in range(1, tenor_bulan + 1):
-            sisa_tenor = tenor_bulan - bulan + 1
             if data_kredit["tipe"] == "floating":
                 bunga_bln = (bunga_promo if bulan <= masa_promo_bln else bunga_floating) / 100 / 12
-                cicilan = (saldo * (bunga_bln * (1 + bunga_bln)**sisa_tenor) / ((1 + bunga_bln)**sisa_tenor - 1)) if bunga_bln > 0 else saldo/sisa_tenor
+                cicilan = cicilan_promo if bulan <= masa_promo_bln else cicilan_floating
             else:
                 bunga_bln = bunga_tetap / 100 / 12
-                cicilan = (plafon * (bunga_bln * (1 + bunga_bln)**tenor_bulan) / ((1 + bunga_bln)**tenor_bulan - 1)) if bunga_bln > 0 else plafon/tenor_bulan
+                cicilan = cicilan_tetap
+                
             porsi_bunga = saldo * bunga_bln
             porsi_pokok = cicilan - porsi_bunga
-            saldo -= porsi_pokok
-            data_jadwal.append([bulan, cicilan, porsi_pokok, porsi_bunga, max(0, saldo)])
+            saldo = max(0, saldo - porsi_pokok)
+            data_jadwal.append([bulan, cicilan, porsi_pokok, porsi_bunga, saldo])
         
         df_jadwal = pd.DataFrame(data_jadwal, columns=["Bulan", "Total Angsuran", "Porsi Pokok", "Porsi Bunga", "Sisa Pinjaman"])
         
+        # --- TAMPILAN UI ---
         total_pembayaran_kredit = df_jadwal["Total Angsuran"].sum()
         total_beban_bunga = df_jadwal["Porsi Bunga"].sum()
         
-        st.subheader(f"Total Kewajiban Pinjaman Hingga Lunas: :red[Rp {total_pembayaran_kredit:,.0f}]")
+        st.subheader(f"Total Kewajiban Pinjaman: :red[Rp {total_pembayaran_kredit:,.0f}]")
         
+        # Metrik Ringkasan
         cm1, cm2 = st.columns(2)
         cm1.metric("Total Pokok Hutang", f"Rp {plafon:,.0f}")
-        cm2.metric("Total Biaya Bunga (Cost of Credit)", f"Rp {total_beban_bunga:,.0f}")
+        cm2.metric("Total Biaya Bunga", f"Rp {total_beban_bunga:,.0f}")
         
+        # Grafik Bar (Tanpa garis tepi/barcode)
         fig_pinjaman = go.Figure()
-        fig_pinjaman.add_trace(go.Bar(
-            x=df_jadwal["Bulan"], y=df_jadwal["Porsi Pokok"], 
-            name="Porsi Pokok", marker_color='#00CC96', marker_line_width=0
-        ))
-        fig_pinjaman.add_trace(go.Bar(
-            x=df_jadwal["Bulan"], y=df_jadwal["Porsi Bunga"], 
-            name="Porsi Bunga", marker_color='#EF553B', marker_line_width=0
-        ))
-        fig_pinjaman.update_layout(
-            title="Komposisi Angsuran Bulanan",
-            barmode='stack', bargap=0, template="plotly_dark", 
-            height=300, margin=dict(l=0, r=0, t=40, b=0),
-            hovermode="x unified"
-        )
+        fig_pinjaman.add_trace(go.Bar(x=df_jadwal["Bulan"], y=df_jadwal["Porsi Pokok"], name="Porsi Pokok", marker_color='#00CC96', marker_line_width=0))
+        fig_pinjaman.add_trace(go.Bar(x=df_jadwal["Bulan"], y=df_jadwal["Porsi Bunga"], name="Porsi Bunga", marker_color='#EF553B', marker_line_width=0))
+        fig_pinjaman.update_layout(barmode='stack', bargap=0, template="plotly_dark", height=300, margin=dict(l=0, r=0, t=20, b=0), hovermode="x unified")
         st.plotly_chart(fig_pinjaman, use_container_width=True)
+
+        # Tabel Detail (Yang Anda minta)
+        with st.expander("Lihat Rincian Per Bulan"):
+            st.dataframe(df_jadwal.style.format("Rp {:,.0f}"), use_container_width=True)
 
 # ==========================================
 # TAB 2: SIMULASI INVESTASI BERTAHAP
