@@ -104,17 +104,16 @@ with tab1:
                 data_jadwal.append([bulan, cicilan_saat_ini, porsi_pokok, porsi_bunga, max(0, saldo)])
                 
         # Konversi ke DataFrame
-df_jadwal = pd.DataFrame(
-    data_jadwal,
-    columns=["Bulan", "Total Angsuran", "Porsi Pokok", "Porsi Bunga", "Sisa Pinjaman"]
-)
+        df_jadwal = pd.DataFrame(data_jadwal, columns=["Bulan", "Total Angsuran", "Porsi Pokok", "Porsi Bunga", "Sisa Pinjaman"])
 
-# =========================
-# RINGKASAN PINJAMAN
-# =========================
+        # Ringkasan Total Pembayaran Pinjaman
 total_bayar_hutang = df_jadwal["Total Angsuran"].sum()
 total_bunga = df_jadwal["Porsi Bunga"].sum()
-total_pokok = df_jadwal["Porsi Pokok"].sum()
+        
+        # Visualisasi Grafik
+        fig_pinjaman = go.Figure()
+        fig_pinjaman.add_trace(go.Bar(x=df_jadwal["Bulan"], y=df_jadwal["Porsi Pokok"], name="Porsi Pokok", marker_color='#00CC96')) 
+        fig_pinjaman.add_trace(go.Bar(x=df_jadwal["Bulan"], y=df_jadwal["Porsi Bunga"], name="Porsi Bunga", marker_color='#EF553B')) 
         
         # Tambahan garis bantu untuk menyoroti perubahan cicilan jika floating
         if data_kredit["tipe"] == "floating":
@@ -131,26 +130,19 @@ total_pokok = df_jadwal["Porsi Pokok"].sum()
         )
         st.plotly_chart(fig_pinjaman, use_container_width=True)
 st.markdown("---")
-st.subheader(":blue[Ringkasan Pembayaran Sampai Lunas]")
 
-col_a, col_b, col_c = st.columns(3)
+col_a, col_b = st.columns(2)
 
 with col_a:
     st.metric(
-        "Pokok Pinjaman",
-        f"Rp {plafon:,.0f}"
+        "Total Bayar Sampai Lunas",
+        f"Rp {total_bayar_hutang:,.0f}"
     )
 
 with col_b:
     st.metric(
-        "Total Bunga",
+        "Total Bunga Dibayar",
         f"Rp {total_bunga:,.0f}"
-    )
-
-with col_c:
-    st.metric(
-        "Total Bayar Sampai Lunas",
-        f"Rp {total_bayar_hutang:,.0f}"
     )
         
     with st.expander("Tampilkan Tabel Detail Amortisasi"):
