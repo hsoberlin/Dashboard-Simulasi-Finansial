@@ -41,7 +41,6 @@ with tab1:
         saldo = plafon
         data_jadwal = []
         
-        # Logika fixed installment per fase perbankan
         if tipe_bunga == "Floating":
             b_promo = (bunga_promo / 100) / 12
             cicilan_promo = (plafon * (b_promo * (1 + b_promo)**tenor_bulan) / ((1 + b_promo)**tenor_bulan - 1)) if b_promo > 0 else plafon/tenor_bulan
@@ -87,7 +86,6 @@ with tab1:
         
         st.markdown("---")
         
-        # Dual-Axis Chart
         fig_pinjaman = make_subplots(specs=[[{"secondary_y": True}]])
         
         fig_pinjaman.add_trace(
@@ -180,19 +178,33 @@ with tab3:
 
     df = pd.DataFrame(data_cross, columns=["Tahun", "Total Aset", "Total Uang Terbakar", "Margin Keuntungan", "Sisa Hutang"])
     
-    df['Selisih_Aset_Terbakar'] = df['Total Aset'] - df['Total Uang Terbakar']
+    # 1. Kapan Margin membayar Sisa Pokok Hutang?
     df['Selisih_Margin_Hutang'] = df['Margin Keuntungan'] - df['Sisa Hutang']
+    be_margin_hutang = df[df['Selisih_Margin_Hutang'] > 0]
     
-    be_aset = df[df['Selisih_Aset_Terbakar'] > 0]
-    thn_be_aset = be_aset.iloc[0]['Tahun'] if not be_aset.empty else "N/A (Di Luar Simulasi)"
-    
-    be_margin = df[df['Selisih_Margin_Hutang'] > 0]
-    thn_be_margin = be_margin.iloc[0]['Tahun'] if not be_margin.empty else "N/A (Di Luar Simulasi)"
+    if not be_margin_hutang.empty:
+        thn_lunas = int(be_margin_hutang.iloc[0]['Tahun'])
+        teks_lunas = f"✅ :green[**Tahun ke-{thn_lunas}**] — Margin sanggup melunasi seluruh sisa hutang tanpa menyentuh modal."
+    else:
+        teks_lunas = "❌ :red[**Belum Tercapai**] — Margin belum cukup untuk melunasi sisa hutang."
 
-    st.subheader("Keterangan Strategis Pembiayaan Proyek (Investor Brief)")
+    # 2. Kapan Margin mengalahkan Total Uang Dibakar?
+    df['Selisih_Margin_Terbakar'] = df['Margin Keuntungan'] - df['Total Uang Terbakar']
+    be_margin_terbakar = df[df['Selisih_Margin_Terbakar'] > 0]
+    
+    if not be_margin_terbakar.empty:
+        thn_bakar = int(be_margin_terbakar.iloc[0]['Tahun'])
+        teks_bakar = f"✅ :green[**Tahun ke-{thn_bakar}**] — Keuntungan murni mengalahkan total akumulasi uang yang disetor ke bank."
+    else:
+        teks_bakar = "❌ :red[**Belum Tercapai**] — Margin belum mengalahkan total uang yang dibakar."
+
+    st.subheader("Investor Brief: Titik Kritis Profitabilitas")
     st.markdown(f"""
-    * **Efisiensi Leverage (Asset vs Cost of Leverage):** Laju pertumbuhan **Total Nilai Aset** diproyeksikan melampaui seluruh biaya akumulasi angsuran yang dibakar ke bank pada **Tahun ke-{thn_be_aset}**. Titik ini memastikan seluruh ongkos modal tertutupi secara fundamental.
-    * **Strategi Pelunasan Tanpa Risiko (Risk-Free Payoff):** Pada **Tahun ke-{thn_be_margin}**, posisi **Margin Keuntungan Murni** memotong garis **Sisa Pokok Hutang**. Kondisi ini membuktikan bahwa strategi ini mampu melunasi seluruh sisa hutang perbankan menggunakan profit berjalan murni, tanpa mengganggu likuiditas ekuitas awal.
+    **1. Kapan nilai margin bisa membayar sisa pokok hutang?**
+    {teks_lunas}
+
+    **2. Kapan nilai margin mengalahkan total uang dibakar?**
+    {teks_bakar}
     """)
 
     fig = go.Figure()
