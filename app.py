@@ -25,7 +25,7 @@ db_bank = {
     }
 }
 
-tab1, tab2, tab3 = st.tabs(["Kalkulator Pinjaman Institusi", "Simulasi Investasi Bertahap", "Analisis Pengajuan Dana"])
+tab1, tab2, tab3 = st.tabs(["Kalkulator Pinjaman Institusi", "Simulasi Investasi Bertahap", "Analisis Margin & Pelunasan"])
 
 # ==========================================
 # TAB 1: KALKULATOR PINJAMAN INSTITUSI
@@ -70,7 +70,6 @@ with tab1:
         
         df_jadwal = pd.DataFrame(data_jadwal, columns=["Bulan", "Total Angsuran", "Porsi Pokok", "Porsi Bunga", "Sisa Pinjaman"])
         
-        # Ringkasan Total Pembayaran
         total_pembayaran_kredit = df_jadwal["Total Angsuran"].sum()
         total_beban_bunga = df_jadwal["Porsi Bunga"].sum()
         
@@ -80,7 +79,6 @@ with tab1:
         cm1.metric("Total Pokok Hutang", f"Rp {plafon:,.0f}")
         cm2.metric("Total Biaya Bunga (Cost of Credit)", f"Rp {total_beban_bunga:,.0f}")
         
-        # PERBAIKAN VISUAL: Hilangkan garis tepi (marker_line_width=0) dan gap (bargap=0)
         fig_pinjaman = go.Figure()
         fig_pinjaman.add_trace(go.Bar(
             x=df_jadwal["Bulan"], y=df_jadwal["Porsi Pokok"], 
@@ -133,84 +131,85 @@ with tab2:
         st.plotly_chart(fig_invest, use_container_width=True)
 
 # ==========================================
-# TAB 3: DASBOR PENGAJUAN DANA (PITCH DECK)
+# TAB 3: ANALISIS MARGIN & PELUNASAN
 # ==========================================
 with tab3:
-    st.header(":red[Analisis Risiko Kredit & Kelayakan Arus Kas]")
+    st.header(":red[Analisis Pelunasan dari Margin Keuntungan (Profit-Based Payoff)]")
+    st.write("Visualisasi ini membuktikan kapan **Margin Keuntungan Murni (Profit)** Anda sudah cukup untuk melunasi **Sisa Pokok Hutang** secara instan, tanpa menyentuh modal pokok investasi sama sekali.")
     
     max_tahun = max(lama_investasi, math.ceil(tenor_bulan / 12))
     data_cross = []
     
     saldo_akhir_tahun = st.session_state.modal_awal
+    modal_kumulatif = st.session_state.modal_awal
     
     for thn in range(1, max_tahun + 1):
-        # 1. Proyeksi Aset
-        if thn == 1:
-            aset_awal_tahun = st.session_state.modal_awal
-        elif thn <= lama_investasi:
-            aset_awal_tahun = saldo_akhir_tahun + st.session_state.tambahan_tahunan
-        else:
-            aset_awal_tahun = saldo_akhir_tahun
+        # 1. Proyeksi Profit Murni (Tanpa Modal Pokok)
+        if thn > 1 and thn <= lama_investasi:
+            saldo_akhir_tahun += st.session_state.tambahan_tahunan
+            modal_kumulatif += st.session_state.tambahan_tahunan
             
-        saldo_akhir_tahun = aset_awal_tahun * (1 + st.session_state.dividen_tahun/100)
-        profit_tahunan = saldo_akhir_tahun - aset_awal_tahun
+        saldo_akhir_tahun *= (1 + st.session_state.dividen_tahun/100)
+        akumulasi_profit = saldo_akhir_tahun - modal_kumulatif
         
-        # 2. Proyeksi Hutang Tahunan
-        bulan_mulai = (thn - 1) * 12
+        # 2. Sisa Pokok Hutang (Sisa Potongan Bank)
         bulan_akhir = min(thn * 12, tenor_bulan)
         
-        if bulan_mulai < tenor_bulan:
-            beban_tahunan = df_jadwal.iloc[bulan_mulai:bulan_akhir]["Total Angsuran"].sum()
+        if bulan_akhir < tenor_bulan:
             sisa_hutang = df_jadwal.iloc[bulan_akhir - 1]["Sisa Pinjaman"]
         else:
-            beban_tahunan = 0
             sisa_hutang = 0
             
-        data_cross.append([thn, saldo_akhir_tahun, sisa_hutang, profit_tahunan, beban_tahunan])
+        # 3. Kemampuan Bayar Cicilan Tahunan dari Profit Tahunan (Micro Cashflow)
+        bulan_mulai = (thn - 1) * 12
+        if bulan_mulai < tenor_bulan:
+            beban_tahunan = df_jadwal.iloc[bulan_mulai:bulan_akhir]["Total Angsuran"].sum()
+        else:
+            beban_tahunan = 0
+            
+        if thn == 1:
+            profit_tahunan = saldo_akhir_tahun - st.session_state.modal_awal
+        else:
+            # Profit tahun berjalan saja
+            profit_tahunan = saldo_akhir_tahun - (saldo_akhir_tahun / (1 + st.session_state.dividen_tahun/100))
+            
+        data_cross.append([thn, akumulasi_profit, sisa_hutang, profit_tahunan, beban_tahunan])
         
-    df_cross = pd.DataFrame(data_cross, columns=["Tahun", "Total Aset", "Sisa Pokok Hutang", "Profit Tahunan", "Beban Cicilan Tahunan"])
+    df_cross = pd.DataFrame(data_cross, columns=["Tahun", "Akumulasi Margin Keuntungan", "Sisa Pokok Hutang", "Profit Tahunan", "Beban Cicilan Tahunan"])
     
-    # --- GRAFIK 1: KEAMANAN AGUNAN (ASSET COVERAGE) ---
-    st.subheader("1. Kurva Keamanan Aset (Asset Coverage vs Sisa Hutang)")
-    st.write("Menunjukkan persilangan likuidasi. Titik potong (X) merepresentasikan tahun di mana portofolio dapat dilikuidasi untuk melunasi seluruh sisa pinjaman.")
+    # --- GRAFIK 1: AKUMULASI PROFIT VS SISA HUTANG ---
+    fig_margin = go.Figure()
+    fig_margin.add_trace(go.Scatter(x=df_cross["Tahun"], y=df_cross["Akumulasi Margin Keuntungan"], name="Akumulasi Margin Keuntungan (Profit)", line=dict(color='#00CC96', width=4)))
+    fig_margin.add_trace(go.Scatter(x=df_cross["Tahun"], y=df_cross["Sisa Pokok Hutang"], name="Total Sisa Potongan (Pokok Hutang)", line=dict(color='#EF553B', width=4)))
     
-    fig_aset = go.Figure()
-    fig_aset.add_trace(go.Scatter(x=df_cross["Tahun"], y=df_cross["Total Aset"], name="Total Nilai Portofolio (Aset)", line=dict(color='#00CC96', width=3.5)))
-    fig_aset.add_trace(go.Scatter(x=df_cross["Tahun"], y=df_cross["Sisa Pokok Hutang"], name="Sisa Pokok Pinjaman", line=dict(color='#EF553B', width=3.5)))
-    
-    fig_aset.update_layout(
+    fig_margin.update_layout(
         xaxis_title="Tahun Ke-", yaxis_title="Nominal (Rp)",
         hovermode="x unified", template="plotly_dark", height=400, margin=dict(l=0, r=0, t=30, b=0)
     )
-    st.plotly_chart(fig_aset, use_container_width=True)
+    st.plotly_chart(fig_margin, use_container_width=True)
     
-    # --- GRAFIK 2: KEMANDIRIAN ARUS KAS (DEBT SERVICE COVERAGE) ---
+    # Metrik Peringatan Titik Temu Pelunasan
+    df_cross['Selisih Pelunasan'] = df_cross['Akumulasi Margin Keuntungan'] - df_cross['Sisa Pokok Hutang']
+    titik_lunas = df_cross[df_cross['Selisih Pelunasan'] > 0]
+    
+    if not titik_lunas.empty:
+        thn_lunas = titik_lunas.iloc[0]['Tahun']
+        st.success(f"✔️ **LAYAK DIBIAYAI:** Pada **Tahun ke-{thn_lunas:.0f}**, Margin Keuntungan Murni telah melampaui Sisa Pokok Hutang. Di titik ini, hutang bisa dilunasi penuh HANYA dengan mencairkan profit, sementara Modal Utama tetap utuh 100%.")
+    else:
+        st.warning("⚠️ **RESIKO:** Hingga akhir simulasi, akumulasi margin keuntungan belum cukup untuk melunasi sisa pokok hutang secara mandiri tanpa menyentuh modal.")
+
+    # --- GRAFIK 2: PROFIT TAHUNAN VS CICILAN TAHUNAN (Cashflow Harian) ---
     st.markdown("---")
-    st.subheader("2. Kemandirian Arus Kas Tahunan (Debt Service Coverage)")
-    st.write("Membandingkan Keuntungan murni per tahun (Gross Yield) terhadap Total Cicilan di tahun tersebut. Menunjukkan kapan investasi mulai membiayai pinjamannya sendiri (Self-Sustaining).")
+    st.subheader("Kemandirian Arus Kas Tahunan")
+    st.write("Mengukur apakah Margin Keuntungan yang dihasilkan *pada tahun berjalan* sudah sanggup membayar total cicilan bank *di tahun yang sama*.")
     
     fig_cf = go.Figure()
-    fig_cf.add_trace(go.Bar(x=df_cross["Tahun"], y=df_cross["Profit Tahunan"], name="Keuntungan Investasi Tahunan", marker_color='#00CC96', marker_line_width=0))
-    fig_cf.add_trace(go.Bar(x=df_cross["Tahun"], y=df_cross["Beban Cicilan Tahunan"], name="Beban Cicilan Tahunan", marker_color='#EF553B', marker_line_width=0))
+    fig_cf.add_trace(go.Bar(x=df_cross["Tahun"], y=df_cross["Profit Tahunan"], name="Margin Keuntungan per Tahun", marker_color='#00CC96', marker_line_width=0))
+    fig_cf.add_trace(go.Bar(x=df_cross["Tahun"], y=df_cross["Beban Cicilan Tahunan"], name="Total Potongan Cicilan per Tahun", marker_color='#EF553B', marker_line_width=0))
     
     fig_cf.update_layout(
-        barmode='group', bargap=0.15, template="plotly_dark", height=400,
+        barmode='group', bargap=0.15, template="plotly_dark", height=350,
         xaxis_title="Tahun Ke-", yaxis_title="Nominal (Rp)",
         hovermode="x unified", margin=dict(l=0, r=0, t=30, b=0)
     )
     st.plotly_chart(fig_cf, use_container_width=True)
-    
-    # --- RINGKASAN METRIK PENGAJUAN ---
-    st.markdown("---")
-    df_cross['Selisih Aset'] = df_cross['Total Aset'] - df_cross['Sisa Pokok Hutang']
-    df_cross['Selisih CF'] = df_cross['Profit Tahunan'] - df_cross['Beban Cicilan Tahunan']
-    
-    titik_aset = df_cross[df_cross['Selisih Aset'] > 0]
-    titik_cf = df_cross[df_cross['Selisih CF'] > 0]
-    
-    thn_aset = titik_aset.iloc[0]['Tahun'] if not titik_aset.empty else "Belum Tercapai"
-    thn_cf = titik_cf.iloc[0]['Tahun'] if not titik_cf.empty else "Belum Tercapai"
-    
-    cm3, cm4 = st.columns(2)
-    cm3.metric("Tahun Pelunasan Dini (Asset > Debt)", f"Tahun ke-{thn_aset}")
-    cm4.metric("Tahun Mandiri Arus Kas (Profit > Cicilan)", f"Tahun ke-{thn_cf}")
