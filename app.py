@@ -131,55 +131,49 @@ with tab2:
         st.plotly_chart(fig_invest, use_container_width=True)
 
 # ==========================================
-# TAB 3: ANALISIS PENGAJUAN INVESTOR (VERSION 4.0)
+# TAB 3: ANALISIS PENGAJUAN INVESTOR
 # ==========================================
 with tab3:
-    st.header(":red[Executive Summary: Profil Risiko & Pertumbuhan]")
+    st.header(":red[Analisis Profitabilitas: Aset vs Biaya Leverage]")
     
-    # Perhitungan Data
-    max_tahun = max(20, math.ceil(tenor_bulan / 12))
-    data_cross = []
-    saldo_akhir = st.session_state.modal_awal
-    modal_total_disetor = st.session_state.modal_awal
+    # ... (Proyeksi data tetap sama) ...
     
     for thn in range(1, max_tahun + 1):
-        if thn > 1 and thn <= 20:
-            saldo_akhir += st.session_state.tambahan_tahunan
-            modal_total_disetor += st.session_state.tambahan_tahunan
+        # 1. Total Nilai Aset (Modal + Profit)
+        if thn == 1:
+            saldo_akhir = st.session_state.modal_awal * (1 + st.session_state.dividen_tahun/100)
+        elif thn <= lama_investasi:
+            saldo_akhir = (saldo_akhir + st.session_state.tambahan_tahunan) * (1 + st.session_state.dividen_tahun/100)
+        else:
+            saldo_akhir *= (1 + st.session_state.dividen_tahun/100)
             
-        saldo_akhir *= (1 + st.session_state.dividen_tahun/100)
-        
-        # Sunk Cost (Modal + Cicilan)
+        # 2. Murni Total Uang Terbakar (Hanya Akumulasi Cicilan Bank)
         bulan_akhir = min(thn * 12, tenor_bulan)
-        uang_cicilan = df_jadwal.iloc[:bulan_akhir]["Total Angsuran"].sum()
+        uang_terbakar_murni = df_jadwal.head(bulan_akhir)["Total Angsuran"].sum()
+        
+        # 3. Akumulasi Margin Keuntungan
+        akumulasi_margin = saldo_akhir - (st.session_state.modal_awal + (thn-1)*st.session_state.tambahan_tahunan)
+        
+        # 4. Sisa Pokok Hutang
         sisa_hutang = df_jadwal.iloc[bulan_akhir - 1]["Sisa Pinjaman"] if bulan_akhir < tenor_bulan else 0
         
-        total_uang_terbakar = modal_total_disetor + uang_cicilan
-        akumulasi_margin = saldo_akhir - modal_total_disetor
-        
-        data_cross.append([thn, saldo_akhir, total_uang_terbakar, akumulasi_margin, sisa_hutang])
+        data_cross.append([thn, saldo_akhir, uang_terbakar_murni, akumulasi_margin, sisa_hutang])
 
     df = pd.DataFrame(data_cross, columns=["Tahun", "Total Aset", "Total Uang Terbakar", "Margin Keuntungan", "Sisa Hutang"])
     
     # Grafik Utama
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Total Aset"], name="Total Nilai Aset (Pokok + Profit)", line=dict(color='#00CC96', width=4)))
-    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Total Uang Terbakar"], name="Total Uang Terbakar (Modal + Cicilan)", line=dict(color='#FFA15A', width=3, dash='dot')))
-    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Margin Keuntungan"], name="Akumulasi Margin Keuntungan", line=dict(color='#636EFA', width=3)))
-    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Sisa Hutang"], name="Sisa Pokok Hutang", line=dict(color='#EF553B', width=3)))
+    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Total Aset"], name="Total Nilai Aset", line=dict(color='#00CC96', width=4)))
+    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Total Uang Terbakar"], name="Total Uang Terbakar (Cicilan Kumulatif)", line=dict(color='#EF553B', width=3, dash='dash')))
+    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Margin Keuntungan"], name="Margin Keuntungan Murni", line=dict(color='#636EFA', width=3)))
+    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Sisa Hutang"], name="Sisa Pokok Hutang", line=dict(color='#FF97FF', width=3)))
     
     fig.update_layout(template="plotly_dark", height=500, hovermode="x unified", margin=dict(l=0, r=0, t=30, b=0))
     st.plotly_chart(fig, use_container_width=True)
-    
+
     # Keterangan untuk Investor
-    st.subheader("Catatan untuk Calon Investor")
     st.info("""
-    **Analisis Keamanan Modal (Capital Protection):**
-    Grafik di atas menunjukkan titik *break-even* strategis di mana **Total Nilai Aset** melampaui **Total Uang Terbakar**. Setelah titik ini, proyek memiliki *cushion* (bantalan) nilai yang terus membesar.
-    
-    **Strategi Pelunasan (Risk-Free Payoff):**
-    Perhatikan persilangan antara **Margin Keuntungan** (Biru) dan **Sisa Hutang** (Merah). Titik potong tersebut adalah momen di mana proyek secara mandiri sanggup melunasi seluruh kewajiban bank tanpa perlu menyentuh sepeser pun dari **Modal Pokok Investasi**.
-    
-    **Kesimpulan:**
-    Proyek ini dirancang untuk mencapai kemandirian finansial dalam jangka menengah, dengan rasio pertumbuhan aset yang secara sistematis menekan biaya bunga dan risiko kredit.
+    **Analisis Profit-Based Payoff:**
+    Grafik di atas memisahkan antara **Risiko Operasional (Cicilan/Uang Terbakar)** dengan **Performa Investasi (Aset & Margin)**. 
+    Investor dapat melihat dengan jelas bahwa pada titik tertentu, **Margin Keuntungan** Anda secara mandiri mampu melunasi **Sisa Pokok Hutang**, yang membuktikan bahwa strategi ini tidak membebani arus kas utama proyek di masa depan.
     """)
