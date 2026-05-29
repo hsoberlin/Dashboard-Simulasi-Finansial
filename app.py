@@ -147,25 +147,26 @@ with tab1:
             template="plotly_dark",
             margin=dict(l=0, r=0, t=40, b=0)
         )
+
         st.plotly_chart(fig_pinjaman, use_container_width=True)
 
-with st.expander("Ringkasan Pembayaran Sampai Lunas"):
-    col_a, col_b = st.columns(2)
+        with st.expander("Ringkasan Pembayaran Sampai Lunas"):
+            col_a, col_b = st.columns(2)
 
-    with col_a:
-        st.metric(
-            "Total Bayar Sampai Lunas",
-            f"Rp {total_bayar_hutang:,.0f}"
-        )
+            with col_a:
+                st.metric(
+                    "Total Bayar Sampai Lunas",
+                    f"Rp {total_bayar_hutang:,.0f}"
+                )
 
-    with col_b:
-        st.metric(
-            "Total Bunga Dibayar",
-            f"Rp {total_bunga:,.0f}"
-        )
+            with col_b:
+                st.metric(
+                    "Total Bunga Dibayar",
+                    f"Rp {total_bunga:,.0f}"
+                )
 
-with st.expander("Tampilkan Tabel Detail Amortisasi"):
-    st.dataframe(df_jadwal.style.format("{:,.0f}"))
+    with st.expander("Tampilkan Tabel Detail Amortisasi"):
+        st.dataframe(df_jadwal.style.format("{:,.0f}"))
 # ==========================================
 # TAB 2: SIMULASI BUNGA MAJEMUK
 # ==========================================
@@ -214,10 +215,9 @@ with tab2:
             template="plotly_dark",
             margin=dict(l=0, r=0, t=40, b=0)
         )
-        st.plotly_chart(fig_invest, use_container_width=True)
-
-    with st.expander("Tampilkan Tabel Detail Pertumbuhan"):
-        st.dataframe(df_invest.style.format("{:,.0f}"))
+        st.plotly_chart(fig_pinjaman, use_container_width=True)
+    with st.expander("Tampilkan Tabel Detail Amortisasi"):
+        st.dataframe(df_jadwal.style.format("{:,.0f}"))
 
 # ==========================================
 # TAB 3: ANALISIS TITIK TEMU (CROSSOVER) FINAL
