@@ -25,7 +25,7 @@ db_bank = {
     }
 }
 
-tab1, tab2, tab3 = st.tabs(["Kalkulator Pinjaman Institusi", "Simulasi Investasi Bertahap", "Analisis Ekuitas Bersih"])
+tab1, tab2, tab3 = st.tabs(["Kalkulator Pinjaman Institusi", "Simulasi Investasi Bertahap", "Analisis PnL Kas"])
 
 # ==========================================
 # TAB 1: KALKULATOR PINJAMAN INSTITUSI
@@ -70,7 +70,7 @@ with tab1:
         
         df_jadwal = pd.DataFrame(data_jadwal, columns=["Bulan", "Total Angsuran", "Porsi Pokok", "Porsi Bunga", "Sisa Pinjaman"])
         
-        # Ringkasan kewajiban pembayaran keseluruhan
+        # Ringkasan Total Pembayaran
         total_pembayaran_kredit = df_jadwal["Total Angsuran"].sum()
         total_beban_bunga = df_jadwal["Porsi Bunga"].sum()
         
@@ -116,23 +116,25 @@ with tab2:
         st.line_chart(df_invest.set_index("Tahun")[["Total Modal Disetor", "Total Portofolio"]])
 
 # ==========================================
-# TAB 3: ANALISIS PERSILANGAN (SINKRONISASI AKTUAL)
+# TAB 3: ANALISIS PnL KAS (Garis Nol)
 # ==========================================
 with tab3:
-    st.header(":red[Analisis Persilangan: Total Nilai Investasi vs Uang Yang Dibakar]")
-    st.write("Grafik ini mengadu total nilai pasar portofolio investasi Anda (Garis Hijau) melawan akumulasi uang cicilan riil yang dibayarkan ke bank (Garis Merah).")
+    st.header(":red[Kurva Profit & Loss Aktual (Cash-on-Cash)]")
+    st.write("Grafik ini menunjukkan Laba Bersih Murni (PnL) yang dihitung dengan mengurangi **Total Nilai Investasi** dengan **Total Uang yang Dibakar** (Modal Disetor + Akumulasi Cicilan Bank).")
     
     max_tahun = max(lama_investasi, math.ceil(tenor_bulan / 12))
     data_cross = []
     
     saldo_cross = st.session_state.modal_awal
+    modal_disetor_cross = st.session_state.modal_awal
     
     for thn in range(1, max_tahun + 1):
-        # 1. Menghitung Total Nilai Investasi Berjalan (Termasuk Modal + Pertumbuhan)
+        # 1. Menghitung Total Nilai Investasi & Modal yang Disetor
         if thn > 1 and thn <= lama_investasi:
             saldo_cross += st.session_state.tambahan_tahunan
+            modal_disetor_cross += st.session_state.tambahan_tahunan
         elif thn > lama_investasi:
-            pass # Nilai investasi dibiarkan menggulung tanpa top-up lagi
+            pass # Nilai investasi dibiarkan menggulung
             
         saldo_cross *= (1 + st.session_state.dividen_tahun/100)
         total_nilai_investasi = saldo_cross
@@ -140,34 +142,55 @@ with tab3:
         # 2. Menghitung akumulasi cicilan murni yang dibakar ke bank
         bulan_berjalan = min(thn * 12, tenor_bulan)
         if bulan_berjalan > 0:
-            uang_yang_dibakar = df_jadwal.head(bulan_berjalan)["Total Angsuran"].sum()
+            uang_cicilan = df_jadwal.head(bulan_berjalan)["Total Angsuran"].sum()
         else:
-            uang_yang_dibakar = df_jadwal["Total Angsuran"].sum()
+            uang_cicilan = df_jadwal["Total Angsuran"].sum()
             
-        data_cross.append([thn, total_nilai_investasi, uang_yang_dibakar])
+        # 3. Menghitung PnL (Total Aset - Seluruh Sunk Cost)
+        total_uang_dibakar = modal_disetor_cross + uang_cicilan
+        pnl_kas = total_nilai_investasi - total_uang_dibakar
         
-    df_cross = pd.DataFrame(data_cross, columns=["Tahun", "Total Nilai Investasi", "Uang Yang Dibakar"])
+        data_cross.append([thn, total_nilai_investasi, total_uang_dibakar, pnl_kas])
+        
+    df_cross = pd.DataFrame(data_cross, columns=["Tahun", "Total Aset", "Sunk Cost", "PnL"])
     
-    fig_cross = go.Figure()
-    fig_cross.add_trace(go.Scatter(x=df_cross["Tahun"], y=df_cross["Total Nilai Investasi"], name="Total Nilai Investasi", line=dict(color='#00CC96', width=3.5)))
-    fig_cross.add_trace(go.Scatter(x=df_cross["Tahun"], y=df_cross["Uang Yang Dibakar"], name="Total Uang Yang Dibakar (Cicilan)", line=dict(color='#EF553B', width=3.5)))
+    # --- VISUALISASI PnL DENGAN PLOTLY ---
+    fig_pnl = go.Figure()
     
-    fig_cross.update_layout(
-        title="Kurva Break-Even Aktual (Aset Portofolio vs Akumulasi Beban Cicilan)",
+    # Menambahkan garis PnL dengan isian warna ke arah nol
+    fig_pnl.add_trace(go.Scatter(
+        x=df_cross["Tahun"], 
+        y=df_cross["PnL"], 
+        mode='lines+markers',
+        name="Net Profit (PnL)", 
+        fill='tozeroy', # Mengisi warna dari garis ke titik nol
+        fillcolor='rgba(0, 204, 150, 0.2)', # Hijau transparan
+        line=dict(color='#00CC96', width=4)
+    ))
+    
+    # Garis Nol / Break-Even Line (Warna Putih Tegas)
+    fig_pnl.add_hline(y=0, line_width=2, line_dash="solid", line_color="white")
+    
+    fig_pnl.update_layout(
+        title="Kurva Absolute Break-Even (Kapan Portofolio Mengalahkan Sunk Cost?)",
         xaxis_title="Tahun Ke-",
-        yaxis_title="Nominal (Rp)",
+        yaxis_title="Nominal PnL (Rp)",
         hovermode="x unified",
         template="plotly_dark",
         margin=dict(l=0, r=0, t=40, b=0)
     )
-    st.plotly_chart(fig_cross, use_container_width=True)
     
-    # Deteksi Titik Persilangan Aktual
-    df_cross['Spread'] = df_cross['Total Nilai Investasi'] - df_cross['Uang Yang Dibakar']
-    titik_temu = df_cross[df_cross['Spread'] > 0]
+    st.plotly_chart(fig_pnl, use_container_width=True)
+    
+    # Deteksi Titik Break-Even
+    titik_temu = df_cross[df_cross['PnL'] > 0]
     
     if not titik_temu.empty:
-        tahun_temu = titik_temu.iloc[0]['Tahun']
-        st.success(f"Portofolio Anda mencetak keunggulan terhadap liabilitas pada **Tahun ke-{tahun_temu:.0f}**. Di titik ini, nilai pasar investasi jauh melampaui total dana kas yang dilepas untuk mencicil.")
+        tahun_be = titik_temu.iloc[0]['Tahun']
+        # Mengubah baris dataframe yang minus menjadi merah untuk styling tabel di bawahnya
+        st.success(f"Portofolio berhasil mencetak **Net-Positive (PnL > 0)** pada **Tahun ke-{tahun_be:.0f}**. Sejak titik ini, seluruh uang yang Anda keluarkan (Modal + Cicilan Bank) sudah impas dan tergantikan penuh oleh pertumbuhan aset.")
     else:
-        st.warning("Nilai investasi belum berhasil melewati akumulasi beban cicilan bank pada rentang waktu pengujian.")
+        st.warning("Hingga akhir periode simulasi, pertumbuhan portofolio belum mampu menutupi akumulasi seluruh modal dan cicilan bank (PnL masih negatif).")
+
+    with st.expander("Tampilkan Rekap Data PnL per Tahun"):
+        st.dataframe(df_cross.style.format("{:,.0f}"))
