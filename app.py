@@ -104,14 +104,7 @@ with tab1:
                 data_jadwal.append([bulan, cicilan_saat_ini, porsi_pokok, porsi_bunga, max(0, saldo)])
                 
         # Konversi ke DataFrame
-df_jadwal = pd.DataFrame(
-    data_jadwal,
-    columns=["Bulan", "Total Angsuran", "Porsi Pokok", "Porsi Bunga", "Sisa Pinjaman"]
-)
-
-# Total pembayaran pinjaman
-total_bayar_hutang = df_jadwal["Total Angsuran"].sum()
-total_bunga = df_jadwal["Porsi Bunga"].sum()
+        df_jadwal = pd.DataFrame(data_jadwal, columns=["Bulan", "Total Angsuran", "Porsi Pokok", "Porsi Bunga", "Sisa Pinjaman"])
         
         # Visualisasi Grafik
         fig_pinjaman = go.Figure()
@@ -132,19 +125,6 @@ total_bunga = df_jadwal["Porsi Bunga"].sum()
             margin=dict(l=0, r=0, t=40, b=0)
         )
         st.plotly_chart(fig_pinjaman, use_container_width=True)
-col_a, col_b = st.columns(2)
-
-with col_a:
-    st.metric(
-        "Total Bayar Sampai Lunas",
-        f"Rp {total_bayar_hutang:,.0f}"
-    )
-
-with col_b:
-    st.metric(
-        "Total Bunga Dibayar",
-        f"Rp {total_bunga:,.0f}"
-    )
         
     with st.expander("Tampilkan Tabel Detail Amortisasi"):
         st.dataframe(df_jadwal.style.format("{:,.0f}"))
