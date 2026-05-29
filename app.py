@@ -171,7 +171,8 @@ with tab3:
         uang_cicilan = df_jadwal.iloc[:bulan_akhir]["Total Angsuran"].sum()
         sisa_hutang = df_jadwal.iloc[bulan_akhir - 1]["Sisa Pinjaman"] if bulan_akhir < tenor_bulan else 0
         
-        total_uang_terbakar = uang_cicilan
+        # PERUBAHAN: Uang terbakar sekarang = Cicilan Bank + Modal Investasi
+        total_uang_terbakar = uang_cicilan + modal_total_disetor
         akumulasi_margin = saldo_akhir - modal_total_disetor
         
         data_cross.append([thn, saldo_akhir, total_uang_terbakar, akumulasi_margin, sisa_hutang])
@@ -188,13 +189,13 @@ with tab3:
     else:
         teks_lunas = "❌ :red[**Belum Tercapai**] — Margin belum cukup untuk melunasi sisa hutang."
 
-    # 2. Kapan Margin mengalahkan Total Uang Dibakar?
+    # 2. Kapan Margin mengalahkan Total Uang Dibakar (Cicilan + Modal)?
     df['Selisih_Margin_Terbakar'] = df['Margin Keuntungan'] - df['Total Uang Terbakar']
     be_margin_terbakar = df[df['Selisih_Margin_Terbakar'] > 0]
     
     if not be_margin_terbakar.empty:
         thn_bakar = int(be_margin_terbakar.iloc[0]['Tahun'])
-        teks_bakar = f"✅ :green[**Tahun ke-{thn_bakar}**] — Keuntungan murni mengalahkan total akumulasi uang yang disetor ke bank."
+        teks_bakar = f"✅ :green[**Tahun ke-{thn_bakar}**] — Keuntungan murni mengalahkan total arus kas keluar (Cicilan + Modal Investasi)."
     else:
         teks_bakar = "❌ :red[**Belum Tercapai**] — Margin belum mengalahkan total uang yang dibakar."
 
@@ -203,13 +204,13 @@ with tab3:
     **1. Kapan nilai margin bisa membayar sisa pokok hutang?**
     {teks_lunas}
 
-    **2. Kapan nilai margin mengalahkan total uang dibakar?**
+    **2. Kapan nilai margin mengalahkan total uang dibakar (Cash Outflow)?**
     {teks_bakar}
     """)
 
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Total Aset"], name="Total Nilai Aset", line=dict(color='#00CC96', width=3.5)))
-    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Total Uang Terbakar"], name="Total Uang Terbakar (Hanya Cicilan)", line=dict(color='#FFA15A', width=2.5, dash='dash')))
+    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Total Uang Terbakar"], name="Total Uang Terbakar (Cicilan + Modal)", line=dict(color='#FFA15A', width=2.5, dash='dash')))
     fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Margin Keuntungan"], name="Margin Keuntungan Murni", line=dict(color='#636EFA', width=3)))
     fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Sisa Hutang"], name="Sisa Pokok Hutang", line=dict(color='#EF553B', width=3)))
     
