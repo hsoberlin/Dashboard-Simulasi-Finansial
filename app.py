@@ -148,7 +148,7 @@ with tab1:
             margin=dict(l=0, r=0, t=40, b=0)
         )
         st.plotly_chart(fig_pinjaman, use_container_width=True)
-st.markdown("---")
+        st.markdown("---")
 
 col_a, col_b = st.columns(2)
 
@@ -164,6 +164,7 @@ with col_b:
         f"Rp {total_bunga:,.0f}"
     )
         
+
     with st.expander("Tampilkan Tabel Detail Amortisasi"):
         st.dataframe(df_jadwal.style.format("{:,.0f}"))
 
