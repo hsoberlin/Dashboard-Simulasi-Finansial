@@ -88,7 +88,26 @@ with tab1:
             data_jadwal.append([bulan, cicilan, porsi_pokok, porsi_bunga, saldo])
         
         df_jadwal = pd.DataFrame(data_jadwal, columns=["Bulan", "Total Angsuran", "Porsi Pokok", "Porsi Bunga", "Sisa Pinjaman"])
-
+# VALIDASI DATA: Pastikan data tidak kosong sebelum diplot
+        if not df_jadwal.empty:
+            fig_pinjaman = go.Figure()
+            fig_pinjaman.add_trace(go.Bar(
+                x=df_jadwal["Bulan"], y=df_jadwal["Porsi Pokok"], 
+                name="Porsi Pokok", marker_color='#00CC96', marker_line_width=0
+            ))
+            fig_pinjaman.add_trace(go.Bar(
+                x=df_jadwal["Bulan"], y=df_jadwal["Porsi Bunga"], 
+                name="Porsi Bunga", marker_color='#EF553B', marker_line_width=0
+            ))
+            fig_pinjaman.update_layout(
+                barmode='stack', bargap=0, template="plotly_dark", 
+                height=300, margin=dict(l=0, r=0, t=40, b=0),
+                hovermode="x unified"
+            )
+            # Pastikan perintah ini ada
+            st.plotly_chart(fig_pinjaman, use_container_width=True)
+        else:
+            st.error("Data jadwal pinjaman kosong, grafik tidak dapat dimuat.")
 # ==========================================
 # TAB 2: SIMULASI INVESTASI BERTAHAP
 # ==========================================
