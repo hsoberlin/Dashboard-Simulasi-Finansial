@@ -104,16 +104,35 @@ with tab1:
                 data_jadwal.append([bulan, cicilan_saat_ini, porsi_pokok, porsi_bunga, max(0, saldo)])
                 
         # Konversi ke DataFrame
-        df_jadwal = pd.DataFrame(data_jadwal, columns=["Bulan", "Total Angsuran", "Porsi Pokok", "Porsi Bunga", "Sisa Pinjaman"])
+        df_jadwal = pd.DataFrame(
+            data_jadwal,
+            columns=["Bulan", "Total Angsuran", "Porsi Pokok", "Porsi Bunga", "Sisa Pinjaman"]
+        )
 
         # Ringkasan Total Pembayaran Pinjaman
-total_bayar_hutang = df_jadwal["Total Angsuran"].sum()
-total_bunga = df_jadwal["Porsi Bunga"].sum()
-        
+        total_bayar_hutang = df_jadwal["Total Angsuran"].sum()
+        total_bunga = df_jadwal["Porsi Bunga"].sum()
+
         # Visualisasi Grafik
         fig_pinjaman = go.Figure()
-        fig_pinjaman.add_trace(go.Bar(x=df_jadwal["Bulan"], y=df_jadwal["Porsi Pokok"], name="Porsi Pokok", marker_color='#00CC96')) 
-        fig_pinjaman.add_trace(go.Bar(x=df_jadwal["Bulan"], y=df_jadwal["Porsi Bunga"], name="Porsi Bunga", marker_color='#EF553B')) 
+
+        fig_pinjaman.add_trace(
+            go.Bar(
+                x=df_jadwal["Bulan"],
+                y=df_jadwal["Porsi Pokok"],
+                name="Porsi Pokok",
+                marker_color='#00CC96'
+            )
+        )
+
+        fig_pinjaman.add_trace(
+            go.Bar(
+                x=df_jadwal["Bulan"],
+                y=df_jadwal["Porsi Bunga"],
+                name="Porsi Bunga",
+                marker_color='#EF553B'
+            )
+        )
         
         # Tambahan garis bantu untuk menyoroti perubahan cicilan jika floating
         if data_kredit["tipe"] == "floating":
