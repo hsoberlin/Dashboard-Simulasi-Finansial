@@ -131,73 +131,59 @@ with tab2:
         st.plotly_chart(fig_invest, use_container_width=True)
 
 # ==========================================
-# TAB 3: ANALISIS PENGAJUAN INVESTOR (VERSION 4.1)
+# TAB 3: ANALISIS PENGAJUAN INVESTOR (VERSION 4.2 - DINAMIS)
 # ==========================================
 with tab3:
     st.header(":red[Executive Summary: Profil Risiko & Pertumbuhan]")
     
-    # Memastikan df_jadwal tersedia, jika belum maka jalankan kalkulasi default
-    if 'df_jadwal' not in locals():
-        st.warning("Data pinjaman belum terdeteksi dari Tab 1. Menggunakan kalkulasi default.")
-        # [Copy-paste logika hitung amortisasi dari Tab 1 ke sini jika perlu]
-        # Untuk sementara, gunakan data dari session state jika ada
+    # 1. Kalkulasi Data
+    max_tahun = max(math.ceil(tenor_bulan / 12), lama_investasi)
+    data_cross = []
+    saldo_akhir = st.session_state.modal_awal
+    modal_total_disetor = st.session_state.modal_awal
+    
+    for thn in range(1, max_tahun + 1):
+        # Aset
+        if thn > 1 and thn <= lama_investasi:
+            saldo_akhir += st.session_state.tambahan_tahunan
+            modal_total_disetor += st.session_state.tambahan_tahunan
+        saldo_akhir *= (1 + st.session_state.dividen_tahun/100)
         
-    try:
-        # Perhitungan Data
-        max_tahun = max(math.ceil(tenor_bulan / 12), lama_investasi)
-        data_cross = []
-        saldo_akhir = st.session_state.modal_awal
-        modal_total_disetor = st.session_state.modal_awal
+        # Sunk Cost (Akumulasi Cicilan)
+        bulan_akhir = min(thn * 12, tenor_bulan)
+        uang_cicilan = df_jadwal.iloc[:bulan_akhir]["Total Angsuran"].sum()
+        sisa_hutang = df_jadwal.iloc[bulan_akhir - 1]["Sisa Pinjaman"] if bulan_akhir < tenor_bulan else 0
         
-        for thn in range(1, max_tahun + 1):
-            if thn > 1 and thn <= 20:
-                saldo_akhir += st.session_state.tambahan_tahunan
-                modal_total_disetor += st.session_state.tambahan_tahunan
-                
-            saldo_akhir *= (1 + st.session_state.dividen_tahun/100)
-            
-            # Sunk Cost (Modal + Cicilan)
-            bulan_akhir = min(thn * 12, tenor_bulan)
-            uang_cicilan = df_jadwal.iloc[:bulan_akhir]["Total Angsuran"].sum()
-            sisa_hutang = df_jadwal.iloc[bulan_akhir - 1]["Sisa Pinjaman"] if bulan_akhir < tenor_bulan else 0
-            
-            # Total Uang Terbakar murni akumulasi cicilan + modal awal
-            total_uang_terbakar = modal_total_disetor + uang_cicilan
-            akumulasi_margin = saldo_akhir - modal_total_disetor
-            
-            data_cross.append([thn, saldo_akhir, total_uang_terbakar, akumulasi_margin, sisa_hutang])
+        total_uang_terbakar = modal_total_disetor + uang_cicilan
+        akumulasi_margin = saldo_akhir - modal_total_disetor
+        
+        data_cross.append([thn, saldo_akhir, total_uang_terbakar, akumulasi_margin, sisa_hutang])
 
-        df = pd.DataFrame(data_cross, columns=["Tahun", "Total Aset", "Total Uang Terbakar", "Margin Keuntungan", "Sisa Hutang"])
-        
-        # Grafik Utama
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Total Aset"], name="Total Nilai Aset (Pokok + Profit)", line=dict(color='#00CC96', width=4)))
-        fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Total Uang Terbakar"], name="Total Uang Terbakar (Modal + Cicilan)", line=dict(color='#FFA15A', width=3, dash='dot')))
-        fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Margin Keuntungan"], name="Akumulasi Margin Keuntungan", line=dict(color='#636EFA', width=3)))
-        fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Sisa Hutang"], name="Sisa Pokok Hutang", line=dict(color='#EF553B', width=3)))
-        
-        fig.update_layout(template="plotly_dark", height=500, hovermode="x unified", margin=dict(l=0, r=0, t=30, b=0))
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # --- LOGIKA NARASI DINAMIS ---
+    df = pd.DataFrame(data_cross, columns=["Tahun", "Total Aset", "Total Uang Terbakar", "Margin Keuntungan", "Sisa Hutang"])
+    
+    # 2. Grafik Utama
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Total Aset"], name="Total Nilai Aset", line=dict(color='#00CC96', width=4)))
+    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Total Uang Terbakar"], name="Total Uang Terbakar", line=dict(color='#FFA15A', width=3, dash='dot')))
+    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Margin Keuntungan"], name="Akumulasi Margin", line=dict(color='#636EFA', width=3)))
+    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Sisa Hutang"], name="Sisa Pokok Hutang", line=dict(color='#EF553B', width=3)))
+    
+    fig.update_layout(template="plotly_dark", height=500, hovermode="x unified", margin=dict(l=0, r=0, t=30, b=0))
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # 3. Analisis Dinamis
     df['Selisih_Aset_Terbakar'] = df['Total Aset'] - df['Total Uang Terbakar']
     df['Selisih_Margin_Hutang'] = df['Margin Keuntungan'] - df['Sisa Hutang']
     
-    # Mencari tahun break-even
     be_aset = df[df['Selisih_Aset_Terbakar'] > 0]
     thn_be_aset = be_aset.iloc[0]['Tahun'] if not be_aset.empty else "di luar periode simulasi"
     
-    # Mencari tahun pelunasan dari margin
     be_margin = df[df['Selisih_Margin_Hutang'] > 0]
     thn_be_margin = be_margin.iloc[0]['Tahun'] if not be_margin.empty else "di luar periode simulasi"
 
-    # --- NARASI DYNAMIC INVESTOR PITCH ---
     st.subheader("Data-Driven Executive Summary")
     st.markdown(f"""
-    * **Capital Protection:** Berdasarkan simulasi, nilai portofolio Anda diproyeksikan akan melampaui total kumulatif dana yang dibakar (Cicilan + Modal) pada **Tahun ke-{thn_be_aset}**. Ini adalah titik krusial di mana investasi Anda mulai memiliki *buffer* nilai yang positif.
-    * **Risk-Free Exit Strategy:** Proyek ini memiliki kapasitas untuk melunasi seluruh sisa pokok hutang secara mandiri menggunakan akumulasi profit pada **Tahun ke-{thn_be_margin}**. Pada titik ini, Anda dapat menutup kewajiban perbankan tanpa mengurangi ekuitas modal utama.
-    * **Financial Resilience:** Rasio pertumbuhan aset terhadap beban bunga menunjukkan tren yang sehat, di mana laju *compounding* aset secara konsisten menekan porsi sisa pokok hutang, meminimalisir eksposur risiko kredit Anda dari tahun ke tahun.
+    * **Capital Protection:** Nilai portofolio diproyeksikan melampaui total kumulatif dana yang dibakar (Cicilan + Modal) pada **Tahun ke-{thn_be_aset}**. Ini adalah *buffer* nilai yang menjadi jaminan keamanan modal.
+    * **Risk-Free Exit Strategy:** Proyek ini memiliki kapasitas melunasi seluruh sisa pokok hutang secara mandiri menggunakan akumulasi margin pada **Tahun ke-{thn_be_margin}**. Pada titik ini, modal utama Anda tetap utuh 100%.
+    * **Financial Resilience:** Rasio pertumbuhan aset menunjukkan efisiensi *leverage* yang konsisten, di mana laju *compounding* aset secara sistematis menekan biaya bunga.
     """)
-        
-    except Exception as e:
-        st.error("Silakan lengkapi input pada 'Kalkulator Pinjaman' (Tab 1) terlebih dahulu untuk memuat data analisis.")
