@@ -70,7 +70,6 @@ with tab1:
         
         df_jadwal = pd.DataFrame(data_jadwal, columns=["Bulan", "Total Angsuran", "Porsi Pokok", "Porsi Bunga", "Sisa Pinjaman"])
         
-        # Ringkasan Total Pembayaran
         total_pembayaran_kredit = df_jadwal["Total Angsuran"].sum()
         total_beban_bunga = df_jadwal["Porsi Bunga"].sum()
         
@@ -80,10 +79,20 @@ with tab1:
         cm1.metric("Total Pokok Hutang", f"Rp {plafon:,.0f}")
         cm2.metric("Total Biaya Bunga (Cost of Credit)", f"Rp {total_beban_bunga:,.0f}")
         
+        # PERBAIKAN VISUAL TAB 1: Hilangkan garis tepi (marker_line_width=0) dan gap (bargap=0)
         fig_pinjaman = go.Figure()
-        fig_pinjaman.add_trace(go.Bar(x=df_jadwal["Bulan"], y=df_jadwal["Porsi Pokok"], name="Porsi Pokok", marker_color='#00CC96'))
-        fig_pinjaman.add_trace(go.Bar(x=df_jadwal["Bulan"], y=df_jadwal["Porsi Bunga"], name="Porsi Bunga", marker_color='#EF553B'))
-        fig_pinjaman.update_layout(barmode='stack', template="plotly_dark", height=300, margin=dict(l=0, r=0, t=30, b=0))
+        fig_pinjaman.add_trace(go.Bar(
+            x=df_jadwal["Bulan"], y=df_jadwal["Porsi Pokok"], 
+            name="Porsi Pokok", marker_color='#00CC96', marker_line_width=0
+        ))
+        fig_pinjaman.add_trace(go.Bar(
+            x=df_jadwal["Bulan"], y=df_jadwal["Porsi Bunga"], 
+            name="Porsi Bunga", marker_color='#EF553B', marker_line_width=0
+        ))
+        fig_pinjaman.update_layout(
+            barmode='stack', bargap=0, template="plotly_dark", 
+            height=300, margin=dict(l=0, r=0, t=30, b=0)
+        )
         st.plotly_chart(fig_pinjaman, use_container_width=True)
 
 # ==========================================
@@ -129,24 +138,19 @@ with tab3:
     modal_disetor_cross = st.session_state.modal_awal
     
     for thn in range(1, max_tahun + 1):
-        # 1. Menghitung Total Nilai Investasi & Modal yang Disetor
         if thn > 1 and thn <= lama_investasi:
             saldo_cross += st.session_state.tambahan_tahunan
             modal_disetor_cross += st.session_state.tambahan_tahunan
-        elif thn > lama_investasi:
-            pass # Nilai investasi dibiarkan menggulung
             
         saldo_cross *= (1 + st.session_state.dividen_tahun/100)
         total_nilai_investasi = saldo_cross
         
-        # 2. Menghitung akumulasi cicilan murni yang dibakar ke bank
         bulan_berjalan = min(thn * 12, tenor_bulan)
         if bulan_berjalan > 0:
             uang_cicilan = df_jadwal.head(bulan_berjalan)["Total Angsuran"].sum()
         else:
             uang_cicilan = df_jadwal["Total Angsuran"].sum()
             
-        # 3. Menghitung PnL (Total Aset - Seluruh Sunk Cost)
         total_uang_dibakar = modal_disetor_cross + uang_cicilan
         pnl_kas = total_nilai_investasi - total_uang_dibakar
         
@@ -154,21 +158,29 @@ with tab3:
         
     df_cross = pd.DataFrame(data_cross, columns=["Tahun", "Total Aset", "Sunk Cost", "PnL"])
     
-    # --- VISUALISASI PnL DENGAN PLOTLY ---
+    # PERBAIKAN VISUAL TAB 3: Dinamisasi Warna Area Berdasarkan Profit/Loss
     fig_pnl = go.Figure()
     
-    # Menambahkan garis PnL dengan isian warna ke arah nol
+    # Memisahkan data positif dan negatif untuk gradien yang lebih intuitif
+    df_cross['PnL_Positif'] = df_cross['PnL'].apply(lambda x: x if x >= 0 else None)
+    df_cross['PnL_Negatif'] = df_cross['PnL'].apply(lambda x: x if x < 0 else None)
+    
+    # Trace Area Negatif (Merah)
     fig_pnl.add_trace(go.Scatter(
-        x=df_cross["Tahun"], 
-        y=df_cross["PnL"], 
-        mode='lines+markers',
-        name="Net Profit (PnL)", 
-        fill='tozeroy', # Mengisi warna dari garis ke titik nol
-        fillcolor='rgba(0, 204, 150, 0.2)', # Hijau transparan
-        line=dict(color='#00CC96', width=4)
+        x=df_cross["Tahun"], y=df_cross["PnL_Negatif"], 
+        mode='lines', name="Fase Drawdown (Loss)", 
+        line=dict(color='#EF553B', width=3),
+        fill='tozeroy', fillcolor='rgba(239, 85, 59, 0.2)'
     ))
     
-    # Garis Nol / Break-Even Line (Warna Putih Tegas)
+    # Trace Area Positif (Hijau)
+    fig_pnl.add_trace(go.Scatter(
+        x=df_cross["Tahun"], y=df_cross["PnL_Positif"], 
+        mode='lines', name="Fase Profit (Break-Even)", 
+        line=dict(color='#00CC96', width=3),
+        fill='tozeroy', fillcolor='rgba(0, 204, 150, 0.2)'
+    ))
+    
     fig_pnl.add_hline(y=0, line_width=2, line_dash="solid", line_color="white")
     
     fig_pnl.update_layout(
@@ -179,15 +191,12 @@ with tab3:
         template="plotly_dark",
         margin=dict(l=0, r=0, t=40, b=0)
     )
-    
     st.plotly_chart(fig_pnl, use_container_width=True)
     
-    # Deteksi Titik Break-Even
     titik_temu = df_cross[df_cross['PnL'] > 0]
     
     if not titik_temu.empty:
         tahun_be = titik_temu.iloc[0]['Tahun']
-        # Mengubah baris dataframe yang minus menjadi merah untuk styling tabel di bawahnya
         st.success(f"Portofolio berhasil mencetak **Net-Positive (PnL > 0)** pada **Tahun ke-{tahun_be:.0f}**. Sejak titik ini, seluruh uang yang Anda keluarkan (Modal + Cicilan Bank) sudah impas dan tergantikan penuh oleh pertumbuhan aset.")
     else:
         st.warning("Hingga akhir periode simulasi, pertumbuhan portofolio belum mampu menutupi akumulasi seluruh modal dan cicilan bank (PnL masih negatif).")
