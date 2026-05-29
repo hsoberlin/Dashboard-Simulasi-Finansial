@@ -198,18 +198,4 @@ with tab3:
     else:
         st.warning("⚠️ **RESIKO:** Hingga akhir simulasi, akumulasi margin keuntungan belum cukup untuk melunasi sisa pokok hutang secara mandiri tanpa menyentuh modal.")
 
-    # --- GRAFIK 2: PROFIT TAHUNAN VS CICILAN TAHUNAN (Cashflow Harian) ---
-    st.markdown("---")
-    st.subheader("Kemandirian Arus Kas Tahunan")
-    st.write("Mengukur apakah Margin Keuntungan yang dihasilkan *pada tahun berjalan* sudah sanggup membayar total cicilan bank *di tahun yang sama*.")
-    
-    fig_cf = go.Figure()
-    fig_cf.add_trace(go.Bar(x=df_cross["Tahun"], y=df_cross["Profit Tahunan"], name="Margin Keuntungan per Tahun", marker_color='#00CC96', marker_line_width=0))
-    fig_cf.add_trace(go.Bar(x=df_cross["Tahun"], y=df_cross["Beban Cicilan Tahunan"], name="Total Potongan Cicilan per Tahun", marker_color='#EF553B', marker_line_width=0))
-    
-    fig_cf.update_layout(
-        barmode='group', bargap=0.15, template="plotly_dark", height=350,
-        xaxis_title="Tahun Ke-", yaxis_title="Nominal (Rp)",
-        hovermode="x unified", margin=dict(l=0, r=0, t=30, b=0)
-    )
-    st.plotly_chart(fig_cf, use_container_width=True)
+   
