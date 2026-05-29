@@ -144,7 +144,7 @@ with tab3:
         
     try:
         # Perhitungan Data
-        max_tahun = max(20, math.ceil(tenor_bulan / 12))
+        max_tahun = max(math.ceil(tenor_bulan / 12), lama_investasi)
         data_cross = []
         saldo_akhir = st.session_state.modal_awal
         modal_total_disetor = st.session_state.modal_awal
