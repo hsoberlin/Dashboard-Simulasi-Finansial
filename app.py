@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -56,7 +55,8 @@ with tab1:
         
         st.caption(f"Sisa Modal Kerja Investasi: Rp {st.session_state.modal_awal:,.0f}")
         
-        tenor_bulan = st.slider("Tenor (Bulan)", min_value=12, max_value=360, value=240, step=12)
+        # MAKSIMAL TENOR DIUBAH MENJADI 240 BULAN (20 TAHUN)
+        tenor_bulan = st.slider("Tenor (Bulan)", min_value=12, max_value=240, value=240, step=12)
         tipe_bunga = st.radio("Tipe Bunga", ["Fixed", "Floating"], horizontal=True)
         
         if tipe_bunga == "Fixed":
