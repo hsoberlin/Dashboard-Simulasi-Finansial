@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -31,6 +32,7 @@ if 'tambahan_tahunan' not in st.session_state: st.session_state.tambahan_tahunan
 if 'dividen_tahun' not in st.session_state: st.session_state.dividen_tahun = 7.0
 if 'lama_investasi' not in st.session_state: st.session_state.lama_investasi = 20
 if 'capex' not in st.session_state: st.session_state.capex = 200000000
+if 'tahun_mulai_suntikan' not in st.session_state: st.session_state.tahun_mulai_suntikan = 2
 
 tab1, tab2, tab3 = st.tabs(["Pinjaman", "Investasi", "Analisis Leverage"])
 
@@ -44,7 +46,10 @@ with tab1:
     with col1:
         st.subheader("Parameter")
         plafon = st.number_input("Plafon Pinjaman (Rp)", min_value=0, value=1000000000, step=50000000, format="%d")
+        st.caption(f"Format Angka Plafon: Rp {plafon:,.0f}")
+        
         capex = st.number_input("Alokasi Capex (Laptop, Server, Langganan)", min_value=0, value=st.session_state.capex, step=10000000, format="%d")
+        st.caption(f"Format Angka Capex: Rp {capex:,.0f}")
         
         st.session_state.capex = capex
         st.session_state.modal_awal = max(0, plafon - capex)
@@ -55,7 +60,7 @@ with tab1:
         tipe_bunga = st.radio("Tipe Bunga", ["Fixed", "Floating"], horizontal=True)
         
         if tipe_bunga == "Fixed":
-            bunga_tetap = st.number_input("Bunga Efektif (% p.a)", value=8.50, step=0.01)
+            bunga_tetap = st.number_input("Bunga Efektif (% p.a)", value=8.10, step=0.01)
         else:
             bunga_promo = st.number_input("Bunga Promo (% p.a)", value=6.00, step=0.01)
             masa_promo_thn = st.number_input("Lama Promo (Tahun)", value=3, step=1)
@@ -130,8 +135,9 @@ with tab2:
     with col3:
         st.session_state.modal_awal = st.number_input("Modal Awal Investasi (Rp)", value=st.session_state.modal_awal, step=10000000)
         st.session_state.tambahan_tahunan = st.number_input("Suntikan Tahunan (Rp)", value=st.session_state.tambahan_tahunan, step=5000000)
+        st.session_state.tahun_mulai_suntikan = st.number_input("Mulai Suntikan di Tahun Ke-", min_value=1, max_value=20, value=st.session_state.tahun_mulai_suntikan, step=1)
         st.session_state.dividen_tahun = st.number_input("Pertumbuhan (%)", value=st.session_state.dividen_tahun, step=0.1)
-        st.session_state.lama_investasi = st.slider("Lama Investasi (Tahun)", 1, 50, st.session_state.lama_investasi)
+        st.session_state.lama_investasi = st.slider("Lama Investasi (Tahun)", 1, 20, st.session_state.lama_investasi)
         
     with col4:
         data_inv = []
@@ -139,7 +145,7 @@ with tab2:
         total_modal_disetor = st.session_state.modal_awal
         
         for t in range(1, st.session_state.lama_investasi + 1):
-            if t > 1: 
+            if t >= st.session_state.tahun_mulai_suntikan: 
                 saldo_running += st.session_state.tambahan_tahunan
                 total_modal_disetor += st.session_state.tambahan_tahunan
             saldo_running *= (1 + st.session_state.dividen_tahun/100)
@@ -166,16 +172,16 @@ with tab3:
     modal_total_disetor = st.session_state.modal_awal
     
     for thn in range(1, max_tahun + 1):
-        if thn > 1 and thn <= st.session_state.lama_investasi:
-            saldo_akhir += st.session_state.tambahan_tahunan
-            modal_total_disetor += st.session_state.tambahan_tahunan
+        if thn <= st.session_state.lama_investasi:
+            if thn >= st.session_state.tahun_mulai_suntikan:
+                saldo_akhir += st.session_state.tambahan_tahunan
+                modal_total_disetor += st.session_state.tambahan_tahunan
         saldo_akhir *= (1 + st.session_state.dividen_tahun/100)
         
         bulan_akhir = min(thn * 12, tenor_bulan)
         uang_cicilan = df_jadwal.iloc[:bulan_akhir]["Total Angsuran"].sum()
         sisa_hutang = df_jadwal.iloc[bulan_akhir - 1]["Sisa Pinjaman"] if bulan_akhir < tenor_bulan else 0
         
-        # Uang terbakar = Cicilan Bank + Suntikan Tunai Tahunan (Tanpa modal awal karena dibiayai utang bank)
         total_uang_terbakar = uang_cicilan + (modal_total_disetor - st.session_state.modal_awal)
         margin_murni = saldo_akhir - modal_total_disetor
         net_asset = saldo_akhir - sisa_hutang
