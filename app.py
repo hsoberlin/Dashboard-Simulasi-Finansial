@@ -103,7 +103,11 @@ with tab1:
         
         total_pembayaran = df_jadwal['Total Angsuran'].sum()
         total_bunga = df_jadwal['Porsi Bunga'].sum()
+        
+        # Kalkulasi persentase margin total dan per tahun
         persentase_margin = (total_bunga / plafon) * 100 if plafon > 0 else 0
+        tenor_tahun = tenor_bulan / 12
+        persentase_per_tahun = persentase_margin / tenor_tahun if tenor_tahun > 0 else 0
         
         st.subheader("Ringkasan Kewajiban")
         m1, m2 = st.columns(2)
@@ -111,7 +115,7 @@ with tab1:
         m1.metric("1. Bayar/Bulan", f"Rp {df_jadwal.iloc[0]['Total Angsuran']:,.0f}")
         m2.metric("2. Total Bayar", f"Rp {total_pembayaran:,.0f}")
         m3.metric("3. Pokok Hutang", f"Rp {plafon:,.0f}")
-        m4.metric("4. Total Bunga", f"Rp {total_bunga:,.0f} ({persentase_margin:.2f}%)")
+        m4.metric("4. Total Bunga", f"Rp {total_bunga:,.0f} ({persentase_margin:.2f}% Total | {persentase_per_tahun:.2f}%/thn)")
         
         fig_pinjaman = make_subplots(specs=[[{"secondary_y": True}]])
         fig_pinjaman.add_trace(go.Bar(x=df_jadwal["Bulan"], y=df_jadwal["Porsi Pokok"], name="Porsi Pokok", marker_color='#00CC96', marker_line_width=0), secondary_y=False)
@@ -126,7 +130,15 @@ with tab1:
         st.plotly_chart(fig_pinjaman, use_container_width=True)
 
         with st.expander("Tabel Detail Pembayaran (Per Bulan)"):
-            st.dataframe(df_jadwal.style.format("Rp {:,.0f}"), use_container_width=True, height=250)
+            # Format khusus agar Bulan tidak memakai "Rp"
+            format_dict = {
+                "Bulan": "{:.0f}",
+                "Total Angsuran": "Rp {:,.0f}",
+                "Porsi Pokok": "Rp {:,.0f}",
+                "Porsi Bunga": "Rp {:,.0f}",
+                "Sisa Pinjaman": "Rp {:,.0f}"
+            }
+            st.dataframe(df_jadwal.style.format(format_dict), use_container_width=True, height=250)
 
 # ==========================================
 # TAB 2: SIMULASI INVESTASI
