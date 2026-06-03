@@ -26,10 +26,10 @@ p, h1, h2, h3, label, li, .stMarkdown, .stMetricLabel { color: #F8F9FA !importan
 st.title("Dashboard Simulasi Finansial")
 
 # --- INISIALISASI SESSION STATE ---
-if 'modal_awal' not in st.session_state: st.session_state.modal_awal = 800000000
+if 'modal_awal' not in st.session_state: st.session_state.modal_awal = 450000000
 if 'tambahan_tahunan' not in st.session_state: st.session_state.tambahan_tahunan = 0
 if 'dividen_tahun' not in st.session_state: st.session_state.dividen_tahun = 7.0
-if 'lama_investasi' not in st.session_state: st.session_state.lama_investasi = 20
+if 'lama_investasi' not in st.session_state: st.session_state.lama_investasi = 15
 if 'capex' not in st.session_state: st.session_state.capex = 200000000
 if 'tahun_mulai_suntikan' not in st.session_state: st.session_state.tahun_mulai_suntikan = 2
 
@@ -44,7 +44,7 @@ with tab1:
     
     with col1:
         st.subheader("Parameter")
-        plafon = st.number_input("Plafon Pinjaman (Rp)", min_value=0, value=1000000000, step=50000000, format="%d")
+        plafon = st.number_input("Plafon Pinjaman (Rp)", min_value=0, value=650000000, step=50000000, format="%d")
         st.caption(f"Format Angka Plafon: Rp {plafon:,.0f}")
         
         capex = st.number_input("Alokasi Capex (Laptop, Server, Langganan)", min_value=0, value=st.session_state.capex, step=10000000, format="%d")
@@ -55,8 +55,7 @@ with tab1:
         
         st.caption(f"Sisa Modal Kerja Investasi: Rp {st.session_state.modal_awal:,.0f}")
         
-        # MAKSIMAL TENOR DIUBAH MENJADI 240 BULAN (20 TAHUN)
-        tenor_bulan = st.slider("Tenor (Bulan)", min_value=12, max_value=240, value=240, step=12)
+        tenor_bulan = st.slider("Tenor (Bulan)", min_value=12, max_value=180, value=180, step=12)
         tipe_bunga = st.radio("Tipe Bunga", ["Fixed", "Floating"], horizontal=True)
         
         if tipe_bunga == "Fixed":
@@ -102,13 +101,17 @@ with tab1:
         
         df_jadwal = pd.DataFrame(data_jadwal, columns=["Bulan", "Total Angsuran", "Porsi Pokok", "Porsi Bunga", "Sisa Pinjaman"])
         
+        total_pembayaran = df_jadwal['Total Angsuran'].sum()
+        total_bunga = df_jadwal['Porsi Bunga'].sum()
+        persentase_margin = (total_bunga / plafon) * 100 if plafon > 0 else 0
+        
         st.subheader("Ringkasan Kewajiban")
         m1, m2 = st.columns(2)
         m3, m4 = st.columns(2)
         m1.metric("1. Bayar/Bulan", f"Rp {df_jadwal.iloc[0]['Total Angsuran']:,.0f}")
-        m2.metric("2. Total Bayar", f"Rp {df_jadwal['Total Angsuran'].sum():,.0f}")
+        m2.metric("2. Total Bayar", f"Rp {total_pembayaran:,.0f}")
         m3.metric("3. Pokok Hutang", f"Rp {plafon:,.0f}")
-        m4.metric("4. Total Bunga", f"Rp {df_jadwal['Porsi Bunga'].sum():,.0f}")
+        m4.metric("4. Total Bunga", f"Rp {total_bunga:,.0f} ({persentase_margin:.2f}%)")
         
         fig_pinjaman = make_subplots(specs=[[{"secondary_y": True}]])
         fig_pinjaman.add_trace(go.Bar(x=df_jadwal["Bulan"], y=df_jadwal["Porsi Pokok"], name="Porsi Pokok", marker_color='#00CC96', marker_line_width=0), secondary_y=False)
@@ -135,9 +138,9 @@ with tab2:
     with col3:
         st.session_state.modal_awal = st.number_input("Modal Awal Investasi (Rp)", value=st.session_state.modal_awal, step=10000000)
         st.session_state.tambahan_tahunan = st.number_input("Suntikan Tahunan (Rp)", value=st.session_state.tambahan_tahunan, step=5000000)
-        st.session_state.tahun_mulai_suntikan = st.number_input("Mulai Suntikan di Tahun Ke-", min_value=1, max_value=20, value=st.session_state.tahun_mulai_suntikan, step=1)
+        st.session_state.tahun_mulai_suntikan = st.number_input("Mulai Suntikan di Tahun Ke-", min_value=1, max_value=15, value=st.session_state.tahun_mulai_suntikan, step=1)
         st.session_state.dividen_tahun = st.number_input("Pertumbuhan (%)", value=st.session_state.dividen_tahun, step=0.1)
-        st.session_state.lama_investasi = st.slider("Lama Investasi (Tahun)", 1, 20, st.session_state.lama_investasi)
+        st.session_state.lama_investasi = st.slider("Lama Investasi (Tahun)", 1, 15, st.session_state.lama_investasi)
         
     with col4:
         data_inv = []
