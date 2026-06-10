@@ -1,4 +1,5 @@
 import streamlit as st
+import pd as pd
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -27,206 +28,155 @@ st.title("Dashboard Simulasi Finansial")
 
 # --- INISIALISASI SESSION STATE ---
 if 'modal_awal' not in st.session_state: st.session_state.modal_awal = 450000000
-if 'tambahan_tahunan' not in st.session_state: st.session_state.tambahan_tahunan = 0
-if 'dividen_tahun' not in st.session_state: st.session_state.dividen_tahun = 7.0
-if 'lama_investasi' not in st.session_state: st.session_state.lama_investasi = 15
+if 'cicilan_tetap' not in st.session_state: st.session_state.cicilan_tetap = 0
 if 'capex' not in st.session_state: st.session_state.capex = 200000000
-if 'tahun_mulai_suntikan' not in st.session_state: st.session_state.tahun_mulai_suntikan = 2
+if 'lama_simulasi' not in st.session_state: st.session_state.lama_simulasi = 15
 
-tab1, tab2, tab3 = st.tabs(["Pinjaman", "Investasi", "Analisis Leverage"])
+tab1, tab2, tab3, tab4 = st.tabs(["Pinjaman", "Investasi Utama", "Arus Kas & Side Hustle", "Grand Analysis"])
 
 # ==========================================
-# TAB 1: KALKULATOR PINJAMAN & CAPEX
+# TAB 1: PINJAMAN & CAPEX
 # ==========================================
 with tab1:
-    st.header("Kalkulator Pinjaman & Alokasi Capex")
+    st.header("Kalkulator Pinjaman")
     col1, col2 = st.columns([1, 2.5])
-    
     with col1:
-        st.subheader("Parameter")
         plafon = st.number_input("Plafon Pinjaman (Rp)", min_value=0, value=650000000, step=50000000, format="%d")
-        st.caption(f"Format Angka Plafon: Rp {plafon:,.0f}")
-        
-        capex = st.number_input("Alokasi Capex (Laptop, Server, Langganan)", min_value=0, value=st.session_state.capex, step=10000000, format="%d")
-        st.caption(f"Format Angka Capex: Rp {capex:,.0f}")
-        
-        st.session_state.capex = capex
+        capex = st.number_input("Alokasi Capex", min_value=0, value=st.session_state.capex, step=10000000, format="%d")
         st.session_state.modal_awal = max(0, plafon - capex)
-        
-        st.caption(f"Sisa Modal Kerja Investasi: Rp {st.session_state.modal_awal:,.0f}")
-        
-        tenor_bulan = st.slider("Tenor (Bulan)", min_value=12, max_value=180, value=180, step=12)
-        tipe_bunga = st.radio("Tipe Bunga", ["Fixed", "Floating"], horizontal=True)
-        
-        if tipe_bunga == "Fixed":
-            bunga_tetap = st.number_input("Bunga Efektif (% p.a)", value=8.10, step=0.01)
-        else:
-            bunga_promo = st.number_input("Bunga Promo (% p.a)", value=6.00, step=0.01)
-            masa_promo_thn = st.number_input("Lama Promo (Tahun)", value=3, step=1)
-            bunga_floating = st.number_input("Bunga Floating (% p.a)", value=12.50, step=0.01)
-            masa_promo_bln = masa_promo_thn * 12
-
+        tenor_bulan = st.slider("Tenor (Bulan)", 12, 180, 180, 12)
+        bunga_tetap = st.number_input("Bunga Efektif (% p.a)", value=8.10, step=0.01)
+    
     with col2:
-        saldo = plafon
-        data_jadwal = []
+        b_bln = (bunga_tetap/100)/12
+        cicilan = (plafon * (b_bln * (1 + b_bln)**tenor_bulan) / ((1 + b_bln)**tenor_bulan - 1))
+        st.session_state.cicilan_tetap = cicilan
         
-        if tipe_bunga == "Floating":
-            b_promo = (bunga_promo / 100) / 12
-            cicilan_promo = (plafon * (b_promo * (1 + b_promo)**tenor_bulan) / ((1 + b_promo)**tenor_bulan - 1)) if b_promo > 0 else plafon/tenor_bulan
-            
-            saldo_temp = plafon
-            for b in range(1, masa_promo_bln + 1):
-                porsi_bunga_t = saldo_temp * b_promo
-                saldo_temp -= (cicilan_promo - porsi_bunga_t)
-            
-            b_float = (bunga_floating / 100) / 12
-            sisa_tenor_float = tenor_bulan - masa_promo_bln
-            cicilan_floating = (saldo_temp * (b_float * (1 + b_float)**sisa_tenor_float) / ((1 + b_float)**sisa_tenor_float - 1)) if b_float > 0 else saldo_temp/sisa_tenor_float
-        else:
-            b_tetap = bunga_tetap / 100 / 12
-            cicilan_tetap = (plafon * (b_tetap * (1 + b_tetap)**tenor_bulan) / ((1 + b_tetap)**tenor_bulan - 1)) if b_tetap > 0 else plafon/tenor_bulan
-
-        for bulan in range(1, tenor_bulan + 1):
-            if tipe_bunga == "Floating":
-                bunga_bln = (bunga_promo if bulan <= masa_promo_bln else bunga_floating) / 100 / 12
-                cicilan = cicilan_promo if bulan <= masa_promo_bln else cicilan_floating
-            else:
-                bunga_bln = bunga_tetap / 100 / 12
-                cicilan = cicilan_tetap
-                
-            porsi_bunga = saldo * bunga_bln
-            porsi_pokok = cicilan - porsi_bunga
-            saldo = max(0, saldo - porsi_pokok)
-            data_jadwal.append([bulan, cicilan, porsi_pokok, porsi_bunga, saldo])
-        
-        df_jadwal = pd.DataFrame(data_jadwal, columns=["Bulan", "Total Angsuran", "Porsi Pokok", "Porsi Bunga", "Sisa Pinjaman"])
-        
-        total_pembayaran = df_jadwal['Total Angsuran'].sum()
-        total_bunga = df_jadwal['Porsi Bunga'].sum()
-        
-        persentase_margin = (total_bunga / plafon) * 100 if plafon > 0 else 0
-        tenor_tahun = tenor_bulan / 12
-        persentase_per_tahun = persentase_margin / tenor_tahun if tenor_tahun > 0 else 0
-        
-        st.subheader("Ringkasan Kewajiban")
+        total_bunga = (cicilan * tenor_bulan) - plafon
+        st.subheader("Beban Hutang")
         m1, m2 = st.columns(2)
-        m3, m4 = st.columns(2)
-        m1.metric("1. Bayar/Bulan", f"Rp {df_jadwal.iloc[0]['Total Angsuran']:,.0f}")
-        m2.metric("2. Total Bayar", f"Rp {total_pembayaran:,.0f}")
-        m3.metric("3. Pokok Hutang", f"Rp {plafon:,.0f}")
-        
-        # MENGGUNAKAN PARAMETER DELTA UNTUK TULISAN PERSENTASE LEBIH KECIL
-        m4.metric("4. Total Bunga", f"Rp {total_bunga:,.0f}", delta=f"{persentase_margin:.2f}% Total | {persentase_per_tahun:.2f}% / thn", delta_color="off")
-        
-        fig_pinjaman = make_subplots(specs=[[{"secondary_y": True}]])
-        fig_pinjaman.add_trace(go.Bar(x=df_jadwal["Bulan"], y=df_jadwal["Porsi Pokok"], name="Porsi Pokok", marker_color='#00CC96', marker_line_width=0), secondary_y=False)
-        fig_pinjaman.add_trace(go.Bar(x=df_jadwal["Bulan"], y=df_jadwal["Porsi Bunga"], name="Porsi Bunga", marker_color='#EF553B', marker_line_width=0), secondary_y=False)
-        fig_pinjaman.add_trace(go.Scatter(x=df_jadwal["Bulan"], y=df_jadwal["Sisa Pinjaman"], name="Sisa Hutang", mode='lines', line=dict(color='#636EFA', width=3)), secondary_y=True)
-        
-        fig_pinjaman.update_layout(
-            barmode='stack', bargap=0, template="plotly_dark", height=380, 
-            hovermode="x unified", margin=dict(l=0, r=0, t=10, b=0),
-            legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1)
-        )
-        st.plotly_chart(fig_pinjaman, use_container_width=True)
+        m1.metric("Cicilan / Bulan", f"Rp {cicilan:,.0f}")
+        m2.metric("Total Bunga", f"Rp {total_bunga:,.0f}", delta=f"{(total_bunga/plafon)*100:.2f}% Total")
 
-        with st.expander("Tabel Detail Pembayaran (Per Bulan)"):
-            format_dict = {
-                "Bulan": "{:.0f}",
-                "Total Angsuran": "Rp {:,.0f}",
-                "Porsi Pokok": "Rp {:,.0f}",
-                "Porsi Bunga": "Rp {:,.0f}",
-                "Sisa Pinjaman": "Rp {:,.0f}"
-            }
-            st.dataframe(df_jadwal.style.format(format_dict), use_container_width=True, height=250)
+        # Tabel Sederhana Sisa Hutang untuk Tab 4
+        data_hutang = []
+        curr_saldo = plafon
+        for b in range(1, tenor_bulan + 1):
+            p_bunga = curr_saldo * b_bln
+            p_pokok = cicilan - p_bunga
+            curr_saldo -= p_pokok
+            data_hutang.append(max(0, curr_saldo))
+        df_sisa_hutang = pd.Series(data_hutang)
 
 # ==========================================
-# TAB 2: SIMULASI INVESTASI
+# TAB 2: KANTONG 1 (INVESTASI UTAMA)
 # ==========================================
 with tab2:
-    st.header("Simulasi Investasi Bertahap")
-    col3, col4 = st.columns([1, 2.5])
-    
-    with col3:
-        st.session_state.modal_awal = st.number_input("Modal Awal Investasi (Rp)", value=st.session_state.modal_awal, step=10000000)
-        st.session_state.tambahan_tahunan = st.number_input("Suntikan Tahunan (Rp)", value=st.session_state.tambahan_tahunan, step=5000000)
-        st.session_state.tahun_mulai_suntikan = st.number_input("Mulai Suntikan di Tahun Ke-", min_value=1, max_value=15, value=st.session_state.tahun_mulai_suntikan, step=1)
-        st.session_state.dividen_tahun = st.number_input("Pertumbuhan (%)", value=st.session_state.dividen_tahun, step=0.1)
-        st.session_state.lama_investasi = st.slider("Lama Investasi (Tahun)", 1, 15, st.session_state.lama_investasi)
-        
-    with col4:
-        data_inv = []
-        saldo_running = st.session_state.modal_awal
-        total_modal_disetor = st.session_state.modal_awal
-        
-        for t in range(1, st.session_state.lama_investasi + 1):
-            if t >= st.session_state.tahun_mulai_suntikan: 
-                saldo_running += st.session_state.tambahan_tahunan
-                total_modal_disetor += st.session_state.tambahan_tahunan
-            saldo_running *= (1 + st.session_state.dividen_tahun/100)
-            data_inv.append([t, total_modal_disetor, saldo_running - total_modal_disetor, saldo_running])
-            
-        df_invest = pd.DataFrame(data_inv, columns=["Tahun", "Modal Disetor", "Akumulasi Profit", "Total Portofolio"])
-        st.metric("Total Portofolio Akhir", f"Rp {saldo_running:,.0f}")
-        
-        fig_invest = go.Figure()
-        fig_invest.add_trace(go.Scatter(x=df_invest["Tahun"], y=df_invest["Modal Disetor"], mode='lines', stackgroup='one', name="Modal Disetor", fillcolor='#19D3F3', line=dict(width=0))) 
-        fig_invest.add_trace(go.Scatter(x=df_invest["Tahun"], y=df_invest["Akumulasi Profit"], mode='lines', stackgroup='one', name="Profit", fillcolor='#AB63FA', line=dict(width=0))) 
-        fig_invest.update_layout(template="plotly_dark", height=320, hovermode="x unified", margin=dict(l=0, r=0, t=10, b=0))
-        st.plotly_chart(fig_invest, use_container_width=True)
+    st.header("Kantong 1: Hasil Pinjaman")
+    col_a, col_b = st.columns([1, 2.5])
+    with col_a:
+        roi_a = st.number_input("Target Pertumbuhan A (% p.a)", value=7.0, step=0.1)
+    with col_b:
+        st.metric("Modal Kerja", f"Rp {st.session_state.modal_awal:,.0f}")
+        data_k1 = []
+        saldo_k1 = st.session_state.modal_awal
+        for th in range(1, 16):
+            saldo_k1 *= (1 + roi_a/100)
+            data_k1.append(saldo_k1)
+        st.caption("Investasi ini murni dari sisa plafon bank.")
 
 # ==========================================
-# TAB 3: ANALISIS LEVERAGE (DENGAN CAPEX LOGIC)
+# TAB 3: ARUS KAS & SIDE HUSTLE (KANTONG 2)
 # ==========================================
 with tab3:
-    st.header("Profil Risiko & Kekuatan Margin")
+    st.header("Manajemen Arus Kas & Side Hustle")
+    c1, c2 = st.columns([1, 1])
     
-    max_tahun = max(math.ceil(tenor_bulan / 12), st.session_state.lama_investasi)
-    data_cross = []
-    saldo_akhir = st.session_state.modal_awal
-    modal_total_disetor = st.session_state.modal_awal
-    
-    for thn in range(1, max_tahun + 1):
-        if thn <= st.session_state.lama_investasi:
-            if thn >= st.session_state.tahun_mulai_suntikan:
-                saldo_akhir += st.session_state.tambahan_tahunan
-                modal_total_disetor += st.session_state.tambahan_tahunan
-        saldo_akhir *= (1 + st.session_state.dividen_tahun/100)
-        
-        bulan_akhir = min(thn * 12, tenor_bulan)
-        uang_cicilan = df_jadwal.iloc[:bulan_akhir]["Total Angsuran"].sum()
-        sisa_hutang = df_jadwal.iloc[bulan_akhir - 1]["Sisa Pinjaman"] if bulan_akhir < tenor_bulan else 0
-        
-        total_uang_terbakar = uang_cicilan + (modal_total_disetor - st.session_state.modal_awal)
-        margin_murni = saldo_akhir - modal_total_disetor
-        net_asset = saldo_akhir - sisa_hutang
-        
-        data_cross.append([thn, saldo_akhir, total_uang_terbakar, margin_murni, sisa_hutang, net_asset])
+    with c1:
+        st.subheader("Gaji & Pengeluaran")
+        gaji = st.number_input("Gaji Bulanan (Rp)", value=20000000, step=1000000)
+        naik_gaji = st.slider("Kenaikan Gaji / Thn (%)", 0, 20, 5)
+        potongan_lain = st.number_input("Potongan Pinjaman Lain (Rp)", value=0)
+        biaya_hidup = st.number_input("Kebutuhan Hidup (Rp)", value=10000000, step=500000)
+        inflasi_biaya = st.slider("Inflasi Biaya Hidup (%)", 0, 20, 3)
 
-    df = pd.DataFrame(data_cross, columns=["Tahun", "Total Aset", "Total Uang Terbakar", "Margin Murni", "Sisa Hutang", "Net Asset"])
-    
-    # Kalkulasi Titik Kritis
-    be_lunas = df[df['Margin Murni'] > df['Sisa Hutang']]
-    teks_lunas = f"✅ :green[**Tahun ke-{int(be_lunas.iloc[0]['Tahun'])}**] - Profit sanggup tutup sisa hutang bank." if not be_lunas.empty else "❌ :red[**Belum Tercapai**]"
-    
-    be_bakar = df[df['Margin Murni'] > df['Total Uang Terbakar']]
-    teks_bakar = f"✅ :green[**Tahun ke-{int(be_bakar.iloc[0]['Tahun'])}**] - Profit kalahkan semua cicilan & suntikan dana." if not be_bakar.empty else "❌ :red[**Belum Tercapai**]"
+    with c2:
+        st.subheader("Side Hustle (Tahunan)")
+        sh1 = st.number_input("Side Hustle 1", value=0)
+        sh2 = st.number_input("Side Hustle 2", value=0)
+        sh3 = st.number_input("Side Hustle 3", value=0)
+        sh4 = st.number_input("Side Hustle 4", value=0)
+        sh5 = st.number_input("Side Hustle 5", value=0)
+        roi_b = st.number_input("Target Pertumbuhan B (% p.a)", value=10.0)
 
-    st.markdown(f"""
-    **1. Kapan margin lunasin sisa hutang?** {teks_lunas}  
-    **2. Kapan margin kalahkan uang dibakar?** {teks_bakar}
-    """)
+    # Logika Perhitungan Proyeksi Arus Kas
+    data_k2 = []
+    data_emergency = []
+    saldo_k2 = 0
+    total_emergency = 0
+    
+    # Loop Proyeksi 15 Tahun
+    list_proyeksi = []
+    for t in range(1, 16):
+        gaji_t = gaji * ((1 + naik_gaji/100)**(t-1))
+        biaya_t = biaya_hidup * ((1 + inflasi_biaya/100)**(t-1))
+        cicilan_t = st.session_state.cicilan_tetap if t <= (tenor_bulan/12) else 0
+        
+        sisa_gaji = gaji_t - (potongan_lain + cicilan_t)
+        sisa_bersih_bln = sisa_gaji - biaya_t
+        
+        # Poin g & j (Emergency 50%)
+        total_sh = sh1 + sh2 + sh3 + sh4 + sh5
+        emergency_thn = (sisa_bersih_bln * 12 * 0.5) + (total_sh * 0.5)
+        invest_thn = (sisa_bersih_bln * 12 * 0.5) + (total_sh * 0.5)
+        
+        # Kantong 2 dimulai tahun ke-2 (sesuai rencana Anda)
+        if t >= 2:
+            saldo_k2 = (saldo_k2 + invest_thn) * (1 + roi_b/100)
+        else:
+            saldo_k2 = 0
+            
+        total_emergency += emergency_thn
+        data_k2.append(saldo_k2)
+        data_emergency.append(total_emergency)
+        
+        list_proyeksi.append([t, gaji_t, sisa_bersih_bln, total_sh, saldo_k2, total_emergency])
+
+    df_proyeksi = pd.DataFrame(list_proyeksi, columns=["Thn", "Gaji", "Sisa/Bln", "SideHustle", "Kantong 2", "Total Emergency"])
+    st.subheader("Proyeksi Tabungan & Emergency")
+    st.dataframe(df_proyeksi.style.format("Rp {:,.0f}"), use_container_width=True)
+
+# ==========================================
+# TAB 4: GRAND ANALYSIS (TOTAL LEVERAGE)
+# ==========================================
+with tab4:
+    st.header("Total Net Worth (Kantong 1 + Kantong 2)")
+    
+    data_final = []
+    for i in range(15):
+        th = i + 1
+        idx_bln = min((th * 12) - 1, len(df_sisa_hutang)-1)
+        s_hutang = df_sisa_hutang.iloc[idx_bln] if th <= (tenor_bulan/12) else 0
+        
+        aset_k1 = data_k1[i]
+        aset_k2 = data_k2[i]
+        total_aset = aset_k1 + aset_k2
+        net_worth = total_aset - s_hutang
+        
+        data_final.append([th, aset_k1, aset_k2, total_aset, s_hutang, net_worth])
+    
+    df_final = pd.DataFrame(data_final, columns=["Tahun", "Kantong 1", "Kantong 2", "Total Aset", "Sisa Hutang", "Kekayaan Bersih"])
+    
+    m_a, m_b = st.columns(2)
+    m_a.metric("Total Aset (Tahun 15)", f"Rp {df_final.iloc[-1]['Total Aset']:,.0f}")
+    m_b.metric("Kekayaan Bersih Akhir", f"Rp {df_final.iloc[-1]['Kekayaan Bersih']:,.0f}")
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Total Aset"], name="Total Aset", line=dict(color='#00CC96', width=3)))
-    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Net Asset"], name="Net Asset (Bebas Hutang)", line=dict(color='#FFFFFF', width=3)))
-    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Total Uang Terbakar"], name="Total Uang Terbakar", line=dict(color='#FFA15A', width=2, dash='dash')))
-    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Margin Murni"], name="Margin Keuntungan", line=dict(color='#636EFA', width=3)))
-    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Sisa Hutang"], name="Sisa Hutang", line=dict(color='#EF553B', width=3)))
+    fig.add_trace(go.Scatter(x=df_final["Tahun"], y=df_final["Total Aset"], name="Total Aset Gabungan", line=dict(color='#00CC96', width=4)))
+    fig.add_trace(go.Scatter(x=df_final["Tahun"], y=df_final["Kekayaan Bersih"], name="Net Worth (Bebas Hutang)", line=dict(color='#FFFFFF', width=2, dash='dot')))
+    fig.add_trace(go.Scatter(x=df_final["Tahun"], y=df_final["Sisa Hutang"], name="Sisa Hutang Bank", line=dict(color='#EF553B', width=2)))
     
-    fig.update_layout(
-        template="plotly_dark", height=420, hovermode="x unified", 
-        margin=dict(l=0, r=0, t=10, b=0),
-        legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1)
-    )
+    fig.update_layout(template="plotly_dark", height=450, margin=dict(l=0, r=0, t=10, b=0), legend=dict(orientation="h", y=1.1))
     st.plotly_chart(fig, use_container_width=True)
+    
+    st.caption("Kantong 2 (Side Hustle) mulai berkontribusi signifikan pada pertumbuhan aset di tahun ke-2.")
