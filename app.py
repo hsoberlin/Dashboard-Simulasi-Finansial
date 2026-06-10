@@ -201,7 +201,7 @@ with tab3:
     be_lunas = df[df['Margin Murni'] > df['Sisa Hutang']]
     teks_lunas = f"✅ :green[**Tahun ke-{int(be_lunas.iloc[0]['Tahun'])}**] - Profit sanggup tutup sisa hutang bank." if not be_lunas.empty else "❌ :red[**Belum Tercapai**]"
     
-    be_bakar = df[df['Margin Murni'] > df['Total Uang Terbakar']]
+    be_bakar = df[df['Margin murni'] > df['Total Uang Terbakar']] if 'Margin murni' in df.columns else df[df['Margin Murni'] > df['Total Uang Terbakar']]
     teks_bakar = f"✅ :green[**Tahun ke-{int(be_bakar.iloc[0]['Tahun'])}**] - Profit kalahkan semua cicilan." if not be_bakar.empty else "❌ :red[**Belum Tercapai**]"
 
     st.markdown(f"""
@@ -298,7 +298,7 @@ with tab4:
         tambahan_emergency_th = total_tabungan_th * 0.5
         tambahan_investasi_th = total_tabungan_th * 0.5
         
-        cicilan_th = potongan_2 if th <= tenor_thn_bank else 0
+        cicilan_th =  potongan_2 if th <= tenor_thn_bank else 0
         total_cicilan_th = potongan_1 + cicilan_th
         sisa_gaji_th = gaji_th - total_cicilan_th
         sisa_bln_th = sisa_gaji_th - kebutuhan_th
@@ -320,26 +320,27 @@ with tab4:
         else:
             saldo_invest = 0
             
+        # NILAI CICILAN BANK TELAH DIHAPUS DARI LIST DATA PROYEKSI
         data_proyeksi.append([
-            th, gaji_th, kebutuhan_th, cicilan_th, total_cicilan_th, sisa_bln_th, 
+            th, gaji_th, kebutuhan_th, total_cicilan_th, sisa_bln_th, 
             total_masuk_emergency, akumulasi_emergency, total_masuk_investasi, saldo_invest
         ])
         
+    # JUDUL "Total Dana Darurat" TELAH DIUBAH MENJADI "Total Tabungan"
     df_proyeksi = pd.DataFrame(data_proyeksi, columns=[
-        "Thn", "Gaji/Bln", "Kebutuhan/Bln", "Cicilan Bank/Bln", "Total Cicilan/Bln", "Sisa Bersih/Bln", 
-        "Inflow Emergency", "Total Dana Darurat", "Inflow Investasi SH", "Akumulasi Investasi SH"
+        "Thn", "Gaji/Bln", "Kebutuhan/Bln", "Total Cicilan/Bln", "Sisa Bersih/Bln", 
+        "Inflow Emergency", "Total Tabungan", "Inflow Investasi SH", "Akumulasi Investasi SH"
     ])
     
-    # FORMATTING KHUSUS: Memisahkan "Thn" agar tidak diberikan tanda Rp
+    # FORMATTING: Memisahkan "Thn" agar tidak diberikan tanda Rp
     format_dict_proyeksi = {
         "Thn": "{:.0f}",
         "Gaji/Bln": "Rp {:,.0f}",
         "Kebutuhan/Bln": "Rp {:,.0f}",
-        "Cicilan Bank/Bln": "Rp {:,.0f}",
         "Total Cicilan/Bln": "Rp {:,.0f}",
         "Sisa Bersih/Bln": "Rp {:,.0f}",
         "Inflow Emergency": "Rp {:,.0f}",
-        "Total Dana Darurat": "Rp {:,.0f}",
+        "Total Tabungan": "Rp {:,.0f}",
         "Inflow Investasi SH": "Rp {:,.0f}",
         "Akumulasi Investasi SH": "Rp {:,.0f}"
     }
