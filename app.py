@@ -27,11 +27,9 @@ st.title("Dashboard Simulasi Finansial")
 
 # --- INISIALISASI SESSION STATE ---
 if 'modal_awal' not in st.session_state: st.session_state.modal_awal = 450000000
-if 'tambahan_tahunan' not in st.session_state: st.session_state.tambahan_tahunan = 0
 if 'dividen_tahun' not in st.session_state: st.session_state.dividen_tahun = 7.0
 if 'lama_investasi' not in st.session_state: st.session_state.lama_investasi = 15
 if 'capex' not in st.session_state: st.session_state.capex = 200000000
-if 'tahun_mulai_suntikan' not in st.session_state: st.session_state.tahun_mulai_suntikan = 2
 
 tab1, tab2, tab3, tab4 = st.tabs(["Pinjaman", "Investasi", "Analisis Leverage", "Arus Kas"])
 
@@ -147,13 +145,11 @@ with tab1:
 # TAB 2: SIMULASI INVESTASI
 # ==========================================
 with tab2:
-    st.header("Simulasi Investasi Bertahap")
+    st.header("Simulasi Investasi Pokok")
     col3, col4 = st.columns([1, 2.5])
     
     with col3:
         st.session_state.modal_awal = st.number_input("Modal Awal Investasi (Rp)", value=st.session_state.modal_awal, step=10000000)
-        st.session_state.tambahan_tahunan = st.number_input("Suntikan Tahunan (Rp)", value=st.session_state.tambahan_tahunan, step=5000000)
-        st.session_state.tahun_mulai_suntikan = st.number_input("Mulai Suntikan di Tahun Ke-", min_value=1, max_value=15, value=st.session_state.tahun_mulai_suntikan, step=1)
         st.session_state.dividen_tahun = st.number_input("Pertumbuhan (%)", value=st.session_state.dividen_tahun, step=0.1)
         st.session_state.lama_investasi = st.slider("Lama Investasi (Tahun)", 1, 15, st.session_state.lama_investasi)
         
@@ -163,9 +159,6 @@ with tab2:
         total_modal_disetor = st.session_state.modal_awal
         
         for t in range(1, st.session_state.lama_investasi + 1):
-            if t >= st.session_state.tahun_mulai_suntikan: 
-                saldo_running += st.session_state.tambahan_tahunan
-                total_modal_disetor += st.session_state.tambahan_tahunan
             saldo_running *= (1 + st.session_state.dividen_tahun/100)
             data_inv.append([t, total_modal_disetor, saldo_running - total_modal_disetor, saldo_running])
             
@@ -179,7 +172,7 @@ with tab2:
         st.plotly_chart(fig_invest, use_container_width=True)
 
 # ==========================================
-# TAB 3: ANALISIS LEVERAGE (DENGAN CAPEX LOGIC)
+# TAB 3: ANALISIS LEVERAGE
 # ==========================================
 with tab3:
     st.header("Profil Risiko & Kekuatan Margin")
@@ -190,10 +183,6 @@ with tab3:
     modal_total_disetor = st.session_state.modal_awal
     
     for thn in range(1, max_tahun + 1):
-        if thn <= st.session_state.lama_investasi:
-            if thn >= st.session_state.tahun_mulai_suntikan:
-                saldo_akhir += st.session_state.tambahan_tahunan
-                modal_total_disetor += st.session_state.tambahan_tahunan
         saldo_akhir *= (1 + st.session_state.dividen_tahun/100)
         
         bulan_akhir = min(thn * 12, st.session_state.tenor_bulan_tab1)
@@ -213,7 +202,7 @@ with tab3:
     teks_lunas = f"✅ :green[**Tahun ke-{int(be_lunas.iloc[0]['Tahun'])}**] - Profit sanggup tutup sisa hutang bank." if not be_lunas.empty else "❌ :red[**Belum Tercapai**]"
     
     be_bakar = df[df['Margin Murni'] > df['Total Uang Terbakar']]
-    teks_bakar = f"✅ :green[**Tahun ke-{int(be_bakar.iloc[0]['Tahun'])}**] - Profit kalahkan semua cicilan & suntikan dana." if not be_bakar.empty else "❌ :red[**Belum Tercapai**]"
+    teks_bakar = f"✅ :green[**Tahun ke-{int(be_bakar.iloc[0]['Tahun'])}**] - Profit kalahkan semua cicilan." if not be_bakar.empty else "❌ :red[**Belum Tercapai**]"
 
     st.markdown(f"""
     **1. Kapan margin lunasin sisa hutang?** {teks_lunas}  
@@ -263,8 +252,8 @@ with tab4:
 
         st.markdown("---")
         st.subheader("Asumsi Dinamis Tahunan")
-        naik_gaji = st.slider("Kenaikan Gaji per Tahun (%)", 0, 20, 5)
-        inflasi = st.slider("Kenaikan Kebutuhan Hidup per Tahun (%)", 0, 20, 3)
+        naik_gaji = st.number_input("Kenaikan Gaji per Tahun (%)", value=5.0, step=0.1)
+        inflasi = st.number_input("Kenaikan Kebutuhan Hidup per Tahun (%)", value=3.0, step=0.1)
 
     with col_kas2:
         st.subheader("h. Komponen Tambahan (Side Hustle)")
@@ -275,7 +264,9 @@ with tab4:
         sh5 = st.number_input("5. Side Hustle 5 / Tahun", value=0, step=1000000)
         
         total_tabungan = sh1 + sh2 + sh3 + sh4 + sh5
-        st.metric("i. Total Tabungan Side Hustle", f"Rp {total_tabungan:,.0f}")
+        st.metric("i. Total Tabungan Side Hustle Dasar", f"Rp {total_tabungan:,.0f}")
+        
+        naik_sh = st.number_input("Kenaikan Side Hustle per Tahun (%)", value=5.0, step=0.1)
         
         tambahan_emergency = total_tabungan * 0.5
         st.metric("j. Tambahan Nilai Emergency (50% dari Poin i)", f"Rp {tambahan_emergency:,.0f}")
@@ -298,6 +289,11 @@ with tab4:
         gaji_th = gaji * ((1 + naik_gaji/100)**(th-1))
         kebutuhan_th = kebutuhan * ((1 + inflasi/100)**(th-1))
         
+        # Pertumbuhan nilai Side Hustle setiap tahunnya
+        total_tabungan_th = total_tabungan * ((1 + naik_sh/100)**(th-1))
+        tambahan_emergency_th = total_tabungan_th * 0.5
+        tambahan_investasi_th = total_tabungan_th * 0.5
+        
         cicilan_th = potongan_2 if th <= tenor_thn_bank else 0
         sisa_gaji_th = gaji_th - (potongan_1 + cicilan_th)
         sisa_bln_th = sisa_gaji_th - kebutuhan_th
@@ -307,12 +303,12 @@ with tab4:
         invest_rutin_bln = sisa_bln_th * 0.5 if sisa_bln_th > 0 else 0
         
         # Total setoran tahunan
-        total_masuk_emergency = (emergency_rutin_bln * 12) + tambahan_emergency
-        total_masuk_investasi = (invest_rutin_bln * 12) + tambahan_investasi
+        total_masuk_emergency = (emergency_rutin_bln * 12) + tambahan_emergency_th
+        total_masuk_investasi = (invest_rutin_bln * 12) + tambahan_investasi_th
         
         akumulasi_emergency += total_masuk_emergency
         
-        # Side Hustle baru berputar di tahun ke-2
+        # Side Hustle berputar di tahun ke-2 dan seterusnya
         if th >= 2:
             saldo_invest += total_masuk_investasi
             saldo_invest *= (1 + bunga_invest/100)
@@ -326,7 +322,7 @@ with tab4:
         
     df_proyeksi = pd.DataFrame(data_proyeksi, columns=[
         "Thn", "Gaji/Bln", "Kebutuhan/Bln", "Cicilan/Bln", "Sisa Bersih/Bln", 
-        "Inflow Emergency", "Total Dana Darurat", "Inflow Investasi", "Akumulasi Investasi SH"
+        "Inflow Emergency", "Total Dana Darurat", "Inflow Investasi SH", "Akumulasi Investasi SH"
     ])
     
     st.dataframe(df_proyeksi.style.format("Rp {:,.0f}"), use_container_width=True, height=350)
