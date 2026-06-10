@@ -233,17 +233,21 @@ with tab4:
     
     with col_kas1:
         st.subheader("Pemasukan & Pengeluaran")
-        gaji = st.number_input("a. Gaji Bulanan (Rp)", value=20000000, step=1000000)
-        potongan_1 = st.number_input("b. Potongan Pinjaman Lain (Rp)", value=0, step=500000)
+        gaji = st.number_input("a. Gaji Bulanan (Rp)", min_value=0, value=20000000, step=1000000)
+        potongan_1 = st.number_input("b. Potongan Pinjaman Lain (Rp)", min_value=0, value=0, step=500000)
         
         # Menarik otomatis nilai cicilan dari Tab 1
         potongan_2 = st.session_state.get('angsuran_per_bulan', 0)
         st.metric("c. Potongan Tab 1 (Cicilan Bank)", f"Rp {potongan_2:,.0f}")
         
-        sisa_gaji = gaji - (potongan_1 + potongan_2)
+        # KALKULASI TOTAL CICILAN GABUNGAN (Poin b + Poin c)
+        total_cicilan_gabungan = potongan_1 + potongan_2
+        st.metric("Total Cicilan per Bulan (Gabungan b + c)", f"Rp {total_cicilan_gabungan:,.0f}")
+        
+        sisa_gaji = gaji - total_cicilan_gabungan
         st.metric("d. Sisa Gaji per Bulan", f"Rp {sisa_gaji:,.0f}")
         
-        kebutuhan = st.number_input("e. Kebutuhan Hidup per Bulan (Rp)", value=10000000, step=500000)
+        kebutuhan = st.number_input("e. Kebutuhan Hidup per Bulan (Rp)", min_value=0, value=10000000, step=500000)
         sisa_perbulan = sisa_gaji - kebutuhan
         st.metric("f. Sisa per Bulan", f"Rp {sisa_perbulan:,.0f}")
         
@@ -257,11 +261,11 @@ with tab4:
 
     with col_kas2:
         st.subheader("h. Komponen Tambahan (Side Hustle)")
-        sh1 = st.number_input("1. Side Hustle 1 / Tahun", value=0, step=1000000)
-        sh2 = st.number_input("2. Side Hustle 2 / Tahun", value=0, step=1000000)
-        sh3 = st.number_input("3. Side Hustle 3 / Tahun", value=0, step=1000000)
-        sh4 = st.number_input("4. Side Hustle 4 / Tahun", value=0, step=1000000)
-        sh5 = st.number_input("5. Side Hustle 5 / Tahun", value=0, step=1000000)
+        sh1 = st.number_input("1. Side Hustle 1 / Tahun", min_value=0, value=0, step=1000000)
+        sh2 = st.number_input("2. Side Hustle 2 / Tahun", min_value=0, value=0, step=1000000)
+        sh3 = st.number_input("3. Side Hustle 3 / Tahun", min_value=0, value=0, step=1000000)
+        sh4 = st.number_input("4. Side Hustle 4 / Tahun", min_value=0, value=0, step=1000000)
+        sh5 = st.number_input("5. Side Hustle 5 / Tahun", min_value=0, value=0, step=1000000)
         
         total_tabungan = sh1 + sh2 + sh3 + sh4 + sh5
         st.metric("i. Total Tabungan Side Hustle Dasar", f"Rp {total_tabungan:,.0f}")
@@ -295,7 +299,8 @@ with tab4:
         tambahan_investasi_th = total_tabungan_th * 0.5
         
         cicilan_th = potongan_2 if th <= tenor_thn_bank else 0
-        sisa_gaji_th = gaji_th - (potongan_1 + cicilan_th)
+        total_cicilan_th = potongan_1 + cicilan_th
+        sisa_gaji_th = gaji_th - total_cicilan_th
         sisa_bln_th = sisa_gaji_th - kebutuhan_th
         
         # Pembagian 50:50 dari sisa bersih bulanan
@@ -316,13 +321,27 @@ with tab4:
             saldo_invest = 0
             
         data_proyeksi.append([
-            th, gaji_th, kebutuhan_th, cicilan_th, sisa_bln_th, 
+            th, gaji_th, kebutuhan_th, cicilan_th, total_cicilan_th, sisa_bln_th, 
             total_masuk_emergency, akumulasi_emergency, total_masuk_investasi, saldo_invest
         ])
         
     df_proyeksi = pd.DataFrame(data_proyeksi, columns=[
-        "Thn", "Gaji/Bln", "Kebutuhan/Bln", "Cicilan/Bln", "Sisa Bersih/Bln", 
+        "Thn", "Gaji/Bln", "Kebutuhan/Bln", "Cicilan Bank/Bln", "Total Cicilan/Bln", "Sisa Bersih/Bln", 
         "Inflow Emergency", "Total Dana Darurat", "Inflow Investasi SH", "Akumulasi Investasi SH"
     ])
     
-    st.dataframe(df_proyeksi.style.format("Rp {:,.0f}"), use_container_width=True, height=350)
+    # FORMATTING KHUSUS: Memisahkan "Thn" agar tidak diberikan tanda Rp
+    format_dict_proyeksi = {
+        "Thn": "{:.0f}",
+        "Gaji/Bln": "Rp {:,.0f}",
+        "Kebutuhan/Bln": "Rp {:,.0f}",
+        "Cicilan Bank/Bln": "Rp {:,.0f}",
+        "Total Cicilan/Bln": "Rp {:,.0f}",
+        "Sisa Bersih/Bln": "Rp {:,.0f}",
+        "Inflow Emergency": "Rp {:,.0f}",
+        "Total Dana Darurat": "Rp {:,.0f}",
+        "Inflow Investasi SH": "Rp {:,.0f}",
+        "Akumulasi Investasi SH": "Rp {:,.0f}"
+    }
+    
+    st.dataframe(df_proyeksi.style.format(format_dict_proyeksi), use_container_width=True, height=350)
