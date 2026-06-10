@@ -284,7 +284,6 @@ with tab4:
     
     data_proyeksi = []
     saldo_invest = 0
-    akumulasi_emergency = 0
     
     # Ambil tenor dari Tab 1 untuk memutus kewajiban bayar bank setelah lunas
     tenor_thn_bank = st.session_state.get('tenor_bulan_tab1', 180) / 12
@@ -311,8 +310,6 @@ with tab4:
         total_masuk_emergency = (emergency_rutin_bln * 12) + tambahan_emergency_th
         total_masuk_investasi = (invest_rutin_bln * 12) + tambahan_investasi_th
         
-        akumulasi_emergency += total_masuk_emergency
-        
         # Side Hustle berputar di tahun ke-2 dan seterusnya
         if th >= 2:
             saldo_invest += total_masuk_investasi
@@ -320,19 +317,19 @@ with tab4:
         else:
             saldo_invest = 0
             
-        # NILAI CICILAN BANK TELAH DIHAPUS DARI LIST DATA PROYEKSI
+        # Kolom akumulasi emergency (Total Tabungan) sudah dihapus dari append data
         data_proyeksi.append([
             th, gaji_th, kebutuhan_th, total_cicilan_th, sisa_bln_th, 
-            total_masuk_emergency, akumulasi_emergency, total_masuk_investasi, saldo_invest
+            total_masuk_emergency, total_masuk_investasi, saldo_invest
         ])
         
-    # JUDUL "Total Dana Darurat" TELAH DIUBAH MENJADI "Total Tabungan"
+    # List nama kolom disesuaikan (tanpa Total Tabungan)
     df_proyeksi = pd.DataFrame(data_proyeksi, columns=[
         "Thn", "Gaji/Bln", "Kebutuhan/Bln", "Total Cicilan/Bln", "Sisa Bersih/Bln", 
-        "Inflow Emergency", "Total Tabungan", "Inflow Investasi SH", "Akumulasi Investasi SH"
+        "Inflow Emergency", "Inflow Investasi SH", "Akumulasi Investasi SH"
     ])
     
-    # FORMATTING: Memisahkan "Thn" agar tidak diberikan tanda Rp
+    # Format kamus dictionary disesuaikan
     format_dict_proyeksi = {
         "Thn": "{:.0f}",
         "Gaji/Bln": "Rp {:,.0f}",
@@ -340,7 +337,6 @@ with tab4:
         "Total Cicilan/Bln": "Rp {:,.0f}",
         "Sisa Bersih/Bln": "Rp {:,.0f}",
         "Inflow Emergency": "Rp {:,.0f}",
-        "Total Tabungan": "Rp {:,.0f}",
         "Inflow Investasi SH": "Rp {:,.0f}",
         "Akumulasi Investasi SH": "Rp {:,.0f}"
     }
