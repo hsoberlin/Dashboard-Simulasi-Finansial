@@ -270,6 +270,22 @@ with tab2:
 # ==========================================
 with tab3:
     st.header("Profil Risiko & Kekuatan Margin")
+
+    # TOMBOL DOWNLOAD PDF DIPINDAH KE PALING ATAS TAB 3
+    st.markdown("### Laporan Konsolidasi PDF")
+    st.caption("Unduh ringkasan aset dan arus kas Anda dalam format dokumen.")
+    pdf_file_bytes = generate_pdf()
+    
+    if pdf_file_bytes:
+        st.download_button(
+            label="📄 UNDUH LAPORAN PDF",
+            data=pdf_file_bytes,
+            file_name="Laporan_Konsolidasi_Finansial.pdf",
+            mime="application/pdf"
+        )
+    else:
+        st.error("⚠️ Gagal memuat PDF. Anda harus menjalankan `pip install fpdf` di terminal/CMD Anda atau menambahkannya ke file `requirements.txt`.")
+    st.markdown("---")
     
     max_tahun = max(math.ceil(st.session_state.tenor_bulan_tab1 / 12), st.session_state.lama_investasi)
     data_cross = []
@@ -317,22 +333,6 @@ with tab3:
     )
     st.plotly_chart(fig, use_container_width=True)
 
-    # TOMBOL DOWNLOAD Laporan Konsolidasi PDF
-    st.markdown("---")
-    st.subheader("Laporan Konsolidasi")
-    st.caption("Klik tombol di bawah ini untuk mengunduh laporan PDF gabungan dari seluruh input dan proyeksi Anda.")
-    
-    pdf_file_bytes = generate_pdf()
-    
-    if pdf_file_bytes:
-        st.download_button(
-            label="📄 UNDUH LAPORAN PDF",
-            data=pdf_file_bytes,
-            file_name="Laporan_Konsolidasi_Finansial.pdf",
-            mime="application/pdf"
-        )
-    else:
-        st.error("Gagal memuat tombol unduh. Pastikan Anda sudah menjalankan perintah `pip install fpdf` di server/terminal Anda.")
 
 # ==========================================
 # TAB 4: ARUS KAS & SIDE HUSTLE
