@@ -205,8 +205,6 @@ with tab3:
         uang_cicilan = df_jadwal.iloc[:bulan_akhir]["Total Angsuran"].sum() if 'df_jadwal' in locals() else 0
         sisa_hutang = df_jadwal.iloc[bulan_akhir - 1]["Sisa Pinjaman"] if 'df_jadwal' in locals() and bulan_akhir < st.session_state.tenor_bulan_tab1 else 0
         
-        capex = st.session_state.get("capex", 0)
-
         total_uang_terbakar = capex + uang_cicilan
         margin_murni = saldo_akhir - modal_total_disetor
         net_asset = saldo_akhir - sisa_hutang
@@ -373,48 +371,8 @@ with tab4:
                 self.set_font('Arial', 'I', 8)
                 self.cell(0, 10, f'Halaman {self.page_no()}', 0, 0, 'C')
 
-        pdf = LaporanPDF('L','mm','A4')
+        pdf = LaporanPDF()
         pdf.add_page()
-        pdf.set_fill_color(40,40,40)
-pdf.set_font("Arial","B",12)
-pdf.cell(0,8,f"Investment Rating : {rating}",0,1)
-pdf.set_font("Arial","B",18)
-pdf.cell(0,15,"INVESTMENT FEASIBILITY REPORT",0,1,'C')
-total_return = f_portfolio - st.session_state.modal_awal
-
-pdf.set_font("Arial","B",11)
-pdf.cell(0,8,"Key Metrics",0,1)
-
-pdf.set_font("Arial","",10)
-
-pdf.cell(0,6,f"Initial Capital : Rp {st.session_state.modal_awal:,.0f}",0,1)
-pdf.cell(0,6,f"Final Portfolio : Rp {f_portfolio:,.0f}",0,1)
-pdf.cell(0,6,f"Total Profit : Rp {total_return:,.0f}",0,1)
-pdf.cell(0,6,f"ROI : {roi:.2f}%",0,1)
-pdf.cell(0,6,f"Investment Rating : {rating}",0,1)
-
-pdf.ln(5)
-pdf.set_font("Arial","",11)
-pdf.cell(0,8,"Financial Projection & Leverage Analysis",0,1,'C')
-pdf.ln(10)
-pdf.set_font("Arial","B",12)
-pdf.cell(0,8,"Executive Summary",0,1)
-pdf.set_font("Arial","",10)
-pdf.multi_cell(0,6,f"""Plafon kredit sebesar Rp {plafon:,.0f} digunakan untuk pembelian aset operasional dan modal investasi.Modal produktif yang dapat diputar:Rp {st.session_state.modal_awal:,.0f}
-
-Asumsi pertumbuhan investasi:
-{st.session_state.dividen_tahun:.2f}% per tahun
-
-Proyeksi nilai portofolio akhir:
-Rp {f_portfolio:,.0f}
-
-Titik impas leverage:
-{teks_lunas_raw}
-
-Titik profit mengalahkan seluruh dana yang telah dibakar:
-{teks_bakar_raw}
-"""
-)
         pdf.set_font("Arial", size=10)
         
         # Bab 1
@@ -437,26 +395,6 @@ Titik profit mengalahkan seluruh dana yang telah dibakar:
         pdf.cell(0, 6, f"c. Jangka Waktu Pemutaran: {st.session_state.lama_investasi} Tahun", 0, 1, 'L')
         
         f_portfolio = df_invest.iloc[-1]['Total Portofolio'] if 'df_invest' in locals() else 0
-        ==================================
-HITUNG ROI & RATING INVESTASI
-==================================
-if st.session_state.modal_awal > 0:
-roi = ((f_portfolio / st.session_state.modal_awal) - 1) * 100
-else:
-roi = 0
-
-if roi >= 300:
-rating = "A+ (Excellent)"
-elif roi >= 200:
-rating = "A (Very Strong)"
-elif roi >= 100:
-rating = "B (Attractive)"
-elif roi >= 50:
-rating = "C (Moderate)"
-else:
-rating = "D (Weak)"
-pdf.set_font("Arial","B",12)
-pdf.cell(0,8,f"Investment Rating : {rating}",0,1)
         pdf.cell(0, 6, f"d. Proyeksi Nilai Akhir Portofolio Pokok: Rp {f_portfolio:,.0f}", 0, 1, 'L')
         
         pdf.cell(0, 6, f"e. Kesimpulan Analisis Leverage:", 0, 1, 'L')
@@ -517,10 +455,10 @@ pdf.cell(0,8,f"Investment Rating : {rating}",0,1)
                 
                 pdf.cell(15, 8, f"Thn {t}", 1, 0, 'C')
                 pdf.cell(35, 8, f"Rp {s_hutang:,.0f}", 1, 0, 'R')
-                pdf.cell(40, 8, f"Rp {u_terbakar:,.0f}", 1, 0, 'R')
-                pdf.cell(40, 8, f"Rp {t_aset:,.0f}", 1, 0, 'R')
+                pdf.cell(35, 8, f"Rp {u_terbakar:,.0f}", 1, 0, 'R')
+                pdf.cell(35, 8, f"Rp {t_aset:,.0f}", 1, 0, 'R')
                 pdf.cell(35, 8, f"Rp {n_asset:,.0f}", 1, 0, 'R')
-                pdf.cell(25, 8, f"Rp {a_sh:,.0f}", 1, 1, 'R')
+                pdf.cell(35, 8, f"Rp {a_sh:,.0f}", 1, 1, 'R')
         
         pdf_bytes = pdf.output(dest='S').encode('latin-1')
         
