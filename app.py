@@ -1,4 +1,4 @@
-import streamlit as st
+import streamlit st
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -352,7 +352,7 @@ with tab4:
     st.dataframe(df_proyeksi.style.format(format_dict_proyeksi), use_container_width=True, height=350)
 
     # =========================================================
-    # FITUR AMAN CETAK PDF KONSOLIDASI DENGAN TABEL BARU
+    # FITUR AMAN CETAK PDF KONSOLIDASI DENGAN 6 KOLOM
     # =========================================================
     st.markdown("---")
     st.subheader("📄 Ekspor Laporan Konsolidasi")
@@ -427,35 +427,38 @@ with tab4:
         pdf.cell(0, 6, f"i. Proyeksi Nilai Akhir Kantong Investasi SH (Tahun 15): Rp {f_sh_assets:,.0f}", 0, 1, 'L')
         pdf.ln(5)
 
-        # Bab 4: Tabel Ringkasan dengan Kolom "Total Uang Terbakar"
+        # Bab 4: Tabel Ringkasan Dengan Kolom Baru (Total Portofolio Utama)
         pdf.set_font("Arial", 'B', 11)
         pdf.cell(0, 8, "4. Tabel Ringkasan Proyeksi Finansial Terkonsolidasi", 0, 1, 'L')
         
-        # Header Tabel
-        pdf.set_font("Arial", 'B', 8)
-        # Lebar total: 15 + 40 + 45 + 45 + 45 = 190 (pas untuk A4)
+        # Header Tabel (6 Kolom)
+        pdf.set_font("Arial", 'B', 7.5)
+        # Lebar proporsional pas A4 (Total 190mm): 15 + 35 + 35 + 35 + 35 + 35 = 190
         pdf.cell(15, 8, "Tahun", 1, 0, 'C')
-        pdf.cell(40, 8, "Sisa Hutang Bank", 1, 0, 'C')
-        pdf.cell(45, 8, "Total Uang Terbakar", 1, 0, 'C')
-        pdf.cell(45, 8, "Net Asset (Bebas Hutang)", 1, 0, 'C')
-        pdf.cell(45, 8, "Akumulasi Investasi SH", 1, 1, 'C')
+        pdf.cell(35, 8, "Sisa Hutang Bank", 1, 0, 'C')
+        pdf.cell(35, 8, "Total Uang Terbakar", 1, 0, 'C')
+        pdf.cell(35, 8, "Total Portofolio Utama", 1, 0, 'C')
+        pdf.cell(35, 8, "Net Asset (Bersih)", 1, 0, 'C')
+        pdf.cell(35, 8, "Akumulasi Investasi SH", 1, 1, 'C')
         
         # Isi Tabel (Tahun 1, 5, 10, 15)
-        pdf.set_font("Arial", '', 8)
+        pdf.set_font("Arial", '', 7.5)
         tahun_sampel = [1, 5, 10, 15]
         
         for t in tahun_sampel:
             if t <= len(df) and t <= len(df_proyeksi):
                 s_hutang = df.loc[df['Tahun'] == t, 'Sisa Hutang'].values[0] if not df[df['Tahun'] == t].empty else 0
                 u_terbakar = df.loc[df['Tahun'] == t, 'Total Uang Terbakar'].values[0] if not df[df['Tahun'] == t].empty else 0
+                t_aset = df.loc[df['Tahun'] == t, 'Total Aset'].values[0] if not df[df['Tahun'] == t].empty else 0
                 n_asset = df.loc[df['Tahun'] == t, 'Net Asset'].values[0] if not df[df['Tahun'] == t].empty else 0
                 a_sh = df_proyeksi.loc[df_proyeksi['Thn'] == t, 'Akumulasi Investasi SH'].values[0] if not df_proyeksi[df_proyeksi['Thn'] == t].empty else 0
                 
                 pdf.cell(15, 8, f"Thn {t}", 1, 0, 'C')
-                pdf.cell(40, 8, f"Rp {s_hutang:,.0f}", 1, 0, 'R')
-                pdf.cell(45, 8, f"Rp {u_terbakar:,.0f}", 1, 0, 'R')
-                pdf.cell(45, 8, f"Rp {n_asset:,.0f}", 1, 0, 'R')
-                pdf.cell(45, 8, f"Rp {a_sh:,.0f}", 1, 1, 'R')
+                pdf.cell(35, 8, f"Rp {s_hutang:,.0f}", 1, 0, 'R')
+                pdf.cell(35, 8, f"Rp {u_terbakar:,.0f}", 1, 0, 'R')
+                pdf.cell(35, 8, f"Rp {t_aset:,.0f}", 1, 0, 'R')
+                pdf.cell(35, 8, f"Rp {n_asset:,.0f}", 1, 0, 'R')
+                pdf.cell(35, 8, f"Rp {a_sh:,.0f}", 1, 1, 'R')
         
         pdf_bytes = pdf.output(dest='S').encode('latin-1')
         
