@@ -154,7 +154,6 @@ with tab1:
             }
             st.dataframe(df_jadwal.style.format(format_dict), use_container_width=True, height=250)
             
-        # Simpan ke session state agar terbaca Tab 4 tanpa conflict key
         st.session_state.angsuran_per_bulan = df_jadwal.iloc[0]['Total Angsuran']
         st.session_state.tenor_bulan_tab1 = tenor_bulan
 
@@ -206,7 +205,8 @@ with tab3:
         uang_cicilan = df_jadwal.iloc[:bulan_akhir]["Total Angsuran"].sum() if 'df_jadwal' in locals() else 0
         sisa_hutang = df_jadwal.iloc[bulan_akhir - 1]["Sisa Pinjaman"] if 'df_jadwal' in locals() and bulan_akhir < st.session_state.tenor_bulan_tab1 else 0
         
-        total_uang_terbakar = uang_cicilan + (modal_total_disetor - st.session_state.modal_awal)
+        # PERBAIKAN LOGIKA: Uang Terbakar wajib memasukkan nilai alokasi Capex awal proyek
+        total_uang_terbakar = capex + uang_cicilan
         margin_murni = saldo_akhir - modal_total_disetor
         net_asset = saldo_akhir - sisa_hutang
         
@@ -221,17 +221,17 @@ with tab3:
     
     be_bakar = df[df['Margin Murni'] > df['Total Uang Terbakar']]
     teks_bakar_raw = f"Tahun ke-{int(be_bakar.iloc[0]['Tahun'])}" if not be_bakar.empty else "Belum Tercapai"
-    teks_bakar = f"✅ :green[**{teks_bakar_raw}**] - Profit kalahkan semua cicilan." if not be_bakar.empty else "❌ :red[**Belum Tercapai**]"
+    teks_bakar = f"✅ :green[**{teks_bakar_raw}**] - Profit kalahkan semua cicilan & Capex." if not be_bakar.empty else "❌ :red[**Belum Tercapai**]"
 
     st.markdown(f"""
     **1. Kapan margin lunasin sisa hutang?** {teks_lunas}  
-    **2. Kapan margin kalahkan uang dibakar?** {teks_bakar}
+    **2. Kapan margin kalahkan uang dibakar (Capex + Cicilan)?** {teks_bakar}
     """)
 
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Total Aset"], name="Total Aset", line=dict(color='#00CC96', width=3)))
     fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Net Asset"], name="Net Asset (Bebas Hutang)", line=dict(color='#FFFFFF', width=3)))
-    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Total Uang Terbakar"], name="Total Uang Terbakar", line=dict(color='#FFA15A', width=2, dash='dash')))
+    fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Total Uang Terbakar"], name="Total Uang Terbakar (Capex+Cicilan)", line=dict(color='#FFA15A', width=2, dash='dash')))
     fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Margin Murni"], name="Margin Keuntungan", line=dict(color='#636EFA', width=3)))
     fig.add_trace(go.Scatter(x=df["Tahun"], y=df["Sisa Hutang"], name="Sisa Hutang", line=dict(color='#EF553B', width=3)))
     
@@ -399,10 +399,10 @@ with tab4:
         pdf.cell(0, 6, f"d. Proyeksi Nilai Akhir Portofolio Pokok: Rp {f_portfolio:,.0f}", 0, 1, 'L')
         
         pdf.cell(0, 6, f"e. Kesimpulan Analisis Leverage:", 0, 1, 'L')
-        pdf.cell(5, 6, "", 0, 0) # Indentasi
+        pdf.cell(5, 6, "", 0, 0) 
         pdf.cell(0, 6, f"- Margin melunasi sisa hutang pada: {teks_lunas_raw}", 0, 1, 'L')
-        pdf.cell(5, 6, "", 0, 0) # Indentasi
-        pdf.cell(0, 6, f"- Margin mengalahkan uang dibakar pada: {teks_bakar_raw}", 0, 1, 'L')
+        pdf.cell(5, 6, "", 0, 0) 
+        pdf.cell(0, 6, f"- Margin mengalahkan uang dibakar (Capex + Cicilan) pada: {teks_bakar_raw}", 0, 1, 'L')
         pdf.ln(3)
         
         # Bab 3
@@ -417,14 +417,14 @@ with tab4:
         pdf.cell(0, 6, f"f. Total Pendapatan Dasar Side Hustle: Rp {total_tabungan:,.0f} / tahun", 0, 1, 'L')
         
         pdf.cell(0, 6, f"g. Pertumbuhan Alokasi Investasi (diambil 50% dari total Tabungan SH):", 0, 1, 'L')
-        pdf.cell(5, 6, "", 0, 0) # Indentasi
+        pdf.cell(5, 6, "", 0, 0) 
         pdf.cell(0, 6, f"Asumsi Bunga {bunga_invest}% per tahun (Mulai berputar di Tahun ke-2)", 0, 1, 'L')
         
         pdf.cell(0, 6, f"h. Alokasi Dana Darurat/Emergency (sisa 50% dari Tabungan SH):", 0, 1, 'L')
-        pdf.cell(5, 6, "", 0, 0) # Indentasi
+        pdf.cell(5, 6, "", 0, 0) 
         pdf.cell(0, 6, f"Dana ini disisihkan untuk kebutuhan mendesak dan dianggap habis terpakai.", 0, 1, 'L')
         
-        f_sh_assets = df_proyeksi.iloc[-1]['Akumulasi Investasi SH'] if 'df_proyeksi' in locals() else 0
+        f_sh_assets = df_proyeksi.iloc[-1]['Accumulation Investasi SH'] if 'Accumulation Investasi SH' in df_proyeksi.columns else df_proyeksi.iloc[-1]['Akumulasi Investasi SH'] if 'df_proyeksi' in locals() else 0
         pdf.cell(0, 6, f"i. Proyeksi Nilai Akhir Kantong Investasi SH (Tahun 15): Rp {f_sh_assets:,.0f}", 0, 1, 'L')
         pdf.ln(5)
 
@@ -444,7 +444,6 @@ with tab4:
         tahun_sampel = [1, 5, 10, 15]
         
         for t in tahun_sampel:
-            # Cegah error jika baris tahun tidak ada di dataframe
             if t <= len(df) and t <= len(df_proyeksi):
                 s_hutang = df.loc[df['Tahun'] == t, 'Sisa Hutang'].values[0] if not df[df['Tahun'] == t].empty else 0
                 n_asset = df.loc[df['Tahun'] == t, 'Net Asset'].values[0] if not df[df['Tahun'] == t].empty else 0
@@ -455,7 +454,6 @@ with tab4:
                 pdf.cell(60, 8, f"Rp {n_asset:,.0f}", 1, 0, 'R')
                 pdf.cell(55, 8, f"Rp {a_sh:,.0f}", 1, 1, 'R')
         
-        # Generate biner stream dokumen tanpa menggunakan berkas penampung eksternal
         pdf_bytes = pdf.output(dest='S').encode('latin-1')
         
         st.download_button(
