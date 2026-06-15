@@ -3,15 +3,109 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import math
+import tempfile
+import os
 
 st.set_page_config(page_title="Dashboard Finansial", layout="wide")
 
-# --- CUSTOM CSS SMARTPHONE (PORTRAIT) & BLACK THEME ---
+# --- FUNGSI GENERATE PDF KONSOLIDASI ---
+def generate_pdf():
+    try:
+        from fpdf import FPDF
+    except ImportError:
+        return None
+
+    # Mengambil data dari session_state yang dikunci lewat parameter 'key'
+    plafon = st.session_state.get('k_plafon', 650000000)
+    capex = st.session_state.get('k_capex', 200000000)
+    tenor = st.session_state.get('k_tenor', 180)
+    cicilan = st.session_state.get('angsuran_per_bulan', 0)
+    
+    modal_inv = st.session_state.get('k_modal_inv', 450000000)
+    dividen = st.session_state.get('k_dividen', 7.0)
+    lama_inv = st.session_state.get('k_lama_inv', 15)
+    
+    gaji = st.session_state.get('k_gaji', 20000000)
+    pot_lain = st.session_state.get('k_potongan_1', 0)
+    kebutuhan = st.session_state.get('k_keb', 10000000)
+    
+    # Kalkulasi total side hustle dasar
+    sh_total = sum([st.session_state.get(f'k_sh{i}', 0) for i in range(1, 6)])
+
+    pdf = FPDF()
+    pdf.add_page()
+    
+    # Judul
+    pdf.set_font("Arial", 'B', 16)
+    pdf.cell(0, 10, "Laporan Konsolidasi Finansial", ln=1, align='C')
+    pdf.ln(5)
+
+    # Bagian 1: Pinjaman
+    pdf.set_font("Arial", 'B', 12)
+    pdf.set_text_color(0, 0, 0)
+    pdf.cell(0, 8, "1. Ringkasan Pinjaman & Kewajiban (Tab 1)", ln=1)
+    pdf.set_font("Arial", '', 11)
+    pdf.cell(0, 6, f"- Plafon Pinjaman: Rp {plafon:,.0f}", ln=1)
+    pdf.cell(0, 6, f"- Alokasi Capex: Rp {capex:,.0f}", ln=1)
+    pdf.cell(0, 6, f"- Tenor Pinjaman: {tenor} Bulan", ln=1)
+    pdf.cell(0, 6, f"- Kewajiban Cicilan Bank: Rp {cicilan:,.0f} / bulan", ln=1)
+    pdf.ln(5)
+
+    # Bagian 2: Investasi
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(0, 8, "2. Proyeksi Investasi Pokok (Tab 2)", ln=1)
+    pdf.set_font("Arial", '', 11)
+    pdf.cell(0, 6, f"- Modal Awal Investasi: Rp {modal_inv:,.0f}", ln=1)
+    pdf.cell(0, 6, f"- Target Pertumbuhan: {dividen}% / tahun", ln=1)
+    pdf.cell(0, 6, f"- Lama Investasi: {lama_inv} Tahun", ln=1)
+    
+    saldo_akhir_pokok = modal_inv * ((1 + dividen/100)**lama_inv)
+    pdf.cell(0, 6, f"- Proyeksi Saldo Akhir: Rp {saldo_akhir_pokok:,.0f}", ln=1)
+    pdf.ln(5)
+
+    # Bagian 3: Arus Kas
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(0, 8, "3. Analisis Arus Kas & Side Hustle (Tab 4)", ln=1)
+    pdf.set_font("Arial", '', 11)
+    pdf.cell(0, 6, f"- Gaji Pokok Saat Ini: Rp {gaji:,.0f} / bulan", ln=1)
+    pdf.cell(0, 6, f"- Kebutuhan Hidup: Rp {kebutuhan:,.0f} / bulan", ln=1)
+    
+    total_cicilan = cicilan + pot_lain
+    sisa_kas = gaji - total_cicilan - kebutuhan
+    
+    pdf.cell(0, 6, f"- Total Beban Cicilan (Bank + Lainnya): Rp {total_cicilan:,.0f} / bulan", ln=1)
+    pdf.cell(0, 6, f"- Sisa Kas Bersih Bulanan (Tahun 1): Rp {sisa_kas:,.0f} / bulan", ln=1)
+    pdf.cell(0, 6, f"- Total Pendapatan Side Hustle Dasar: Rp {sh_total:,.0f} / tahun", ln=1)
+
+    # Simpan ke memori sementara (temp file)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        pdf.output(tmp.name)
+        tmp.seek(0)
+        data = tmp.read()
+    os.remove(tmp.name)
+    return data
+
+# --- CUSTOM CSS SMARTPHONE (PORTRAIT), BLACK THEME & YELLOW BUTTON ---
 st.markdown("""
 <style>
 [data-testid="stAppViewContainer"] { background-color: #000000 !important; }
 [data-testid="stHeader"] { background-color: transparent !important; }
 p, h1, h2, h3, label, li, .stMarkdown, .stMetricLabel { color: #F8F9FA !important; }
+
+/* Kustomisasi Tombol Download Menjadi Kuning */
+[data-testid="stDownloadButton"] button {
+    background-color: #FFD700 !important;
+    color: #000000 !important;
+    border: none !important;
+    font-weight: bold !important;
+    width: 100%;
+}
+[data-testid="stDownloadButton"] button:hover {
+    background-color: #FFC107 !important;
+    color: #000000 !important;
+    border: 1px solid #FFFFFF !important;
+}
+
 @media (max-width: 768px) {
     h1 { font-size: 1.2rem !important; }
     h2 { font-size: 1.0rem !important; }
@@ -42,10 +136,10 @@ with tab1:
     
     with col1:
         st.subheader("Parameter")
-        plafon = st.number_input("Plafon Pinjaman (Rp)", min_value=0, value=650000000, step=50000000, format="%d")
+        plafon = st.number_input("Plafon Pinjaman (Rp)", min_value=0, value=650000000, step=50000000, format="%d", key='k_plafon')
         st.caption(f"Format Angka Plafon: Rp {plafon:,.0f}")
         
-        capex = st.number_input("Alokasi Capex (Laptop, Server, Langganan)", min_value=0, value=st.session_state.capex, step=10000000, format="%d")
+        capex = st.number_input("Alokasi Capex (Laptop, Server, Langganan)", min_value=0, value=st.session_state.capex, step=10000000, format="%d", key='k_capex')
         st.caption(f"Format Angka Capex: Rp {capex:,.0f}")
         
         st.session_state.capex = capex
@@ -53,11 +147,11 @@ with tab1:
         
         st.caption(f"Sisa Modal Kerja Investasi: Rp {st.session_state.modal_awal:,.0f}")
         
-        tenor_bulan = st.slider("Tenor (Bulan)", min_value=12, max_value=180, value=180, step=12)
-        tipe_bunga = st.radio("Tipe Bunga", ["Fixed", "Floating"], horizontal=True)
+        tenor_bulan = st.slider("Tenor (Bulan)", min_value=12, max_value=180, value=180, step=12, key='k_tenor')
+        tipe_bunga = st.radio("Tipe Bunga", ["Fixed", "Floating"], horizontal=True, key='k_tipe')
         
         if tipe_bunga == "Fixed":
-            bunga_tetap = st.number_input("Bunga Efektif (% p.a)", value=8.10, step=0.01)
+            bunga_tetap = st.number_input("Bunga Efektif (% p.a)", value=8.10, step=0.01, key='k_bunga')
         else:
             bunga_promo = st.number_input("Bunga Promo (% p.a)", value=6.00, step=0.01)
             masa_promo_thn = st.number_input("Lama Promo (Tahun)", value=3, step=1)
@@ -149,9 +243,9 @@ with tab2:
     col3, col4 = st.columns([1, 2.5])
     
     with col3:
-        st.session_state.modal_awal = st.number_input("Modal Awal Investasi (Rp)", value=st.session_state.modal_awal, step=10000000)
-        st.session_state.dividen_tahun = st.number_input("Pertumbuhan (%)", value=st.session_state.dividen_tahun, step=0.1)
-        st.session_state.lama_investasi = st.slider("Lama Investasi (Tahun)", 1, 15, st.session_state.lama_investasi)
+        st.session_state.modal_awal = st.number_input("Modal Awal Investasi (Rp)", value=st.session_state.modal_awal, step=10000000, key='k_modal_inv')
+        st.session_state.dividen_tahun = st.number_input("Pertumbuhan (%)", value=st.session_state.dividen_tahun, step=0.1, key='k_dividen')
+        st.session_state.lama_investasi = st.slider("Lama Investasi (Tahun)", 1, 15, st.session_state.lama_investasi, key='k_lama_inv')
         
     with col4:
         data_inv = []
@@ -172,7 +266,7 @@ with tab2:
         st.plotly_chart(fig_invest, use_container_width=True)
 
 # ==========================================
-# TAB 3: ANALISIS LEVERAGE
+# TAB 3: ANALISIS LEVERAGE & DOWNLOAD PDF
 # ==========================================
 with tab3:
     st.header("Profil Risiko & Kekuatan Margin")
@@ -201,7 +295,7 @@ with tab3:
     be_lunas = df[df['Margin Murni'] > df['Sisa Hutang']]
     teks_lunas = f"✅ :green[**Tahun ke-{int(be_lunas.iloc[0]['Tahun'])}**] - Profit sanggup tutup sisa hutang bank." if not be_lunas.empty else "❌ :red[**Belum Tercapai**]"
     
-    be_bakar = df[df['Margin murni'] > df['Total Uang Terbakar']] if 'Margin murni' in df.columns else df[df['Margin Murni'] > df['Total Uang Terbakar']]
+    be_bakar = df[df['Margin Murni'] > df['Total Uang Terbakar']]
     teks_bakar = f"✅ :green[**Tahun ke-{int(be_bakar.iloc[0]['Tahun'])}**] - Profit kalahkan semua cicilan." if not be_bakar.empty else "❌ :red[**Belum Tercapai**]"
 
     st.markdown(f"""
@@ -223,6 +317,23 @@ with tab3:
     )
     st.plotly_chart(fig, use_container_width=True)
 
+    # TOMBOL DOWNLOAD Laporan Konsolidasi PDF
+    st.markdown("---")
+    st.subheader("Laporan Konsolidasi")
+    st.caption("Klik tombol di bawah ini untuk mengunduh laporan PDF gabungan dari seluruh input dan proyeksi Anda.")
+    
+    pdf_file_bytes = generate_pdf()
+    
+    if pdf_file_bytes:
+        st.download_button(
+            label="📄 UNDUH LAPORAN PDF",
+            data=pdf_file_bytes,
+            file_name="Laporan_Konsolidasi_Finansial.pdf",
+            mime="application/pdf"
+        )
+    else:
+        st.error("Gagal memuat tombol unduh. Pastikan Anda sudah menjalankan perintah `pip install fpdf` di server/terminal Anda.")
+
 # ==========================================
 # TAB 4: ARUS KAS & SIDE HUSTLE
 # ==========================================
@@ -233,8 +344,8 @@ with tab4:
     
     with col_kas1:
         st.subheader("Pemasukan & Pengeluaran")
-        gaji = st.number_input("a. Gaji Bulanan (Rp)", min_value=0, value=20000000, step=1000000)
-        potongan_1 = st.number_input("b. Potongan Pinjaman Lain (Rp)", min_value=0, value=0, step=500000)
+        gaji = st.number_input("a. Gaji Bulanan (Rp)", min_value=0, value=20000000, step=1000000, key='k_gaji')
+        potongan_1 = st.number_input("b. Potongan Pinjaman Lain (Rp)", min_value=0, value=0, step=500000, key='k_potongan_1')
         
         # Menarik otomatis nilai cicilan dari Tab 1
         potongan_2 = st.session_state.get('angsuran_per_bulan', 0)
@@ -247,7 +358,7 @@ with tab4:
         sisa_gaji = gaji - total_cicilan_gabungan
         st.metric("d. Sisa Gaji per Bulan", f"Rp {sisa_gaji:,.0f}")
         
-        kebutuhan = st.number_input("e. Kebutuhan Hidup per Bulan (Rp)", min_value=0, value=10000000, step=500000)
+        kebutuhan = st.number_input("e. Kebutuhan Hidup per Bulan (Rp)", min_value=0, value=10000000, step=500000, key='k_keb')
         sisa_perbulan = sisa_gaji - kebutuhan
         st.metric("f. Sisa per Bulan", f"Rp {sisa_perbulan:,.0f}")
         
@@ -256,26 +367,26 @@ with tab4:
 
         st.markdown("---")
         st.subheader("Asumsi Dinamis Tahunan")
-        naik_gaji = st.number_input("Kenaikan Gaji per Tahun (%)", value=5.0, step=0.1)
-        inflasi = st.number_input("Kenaikan Kebutuhan Hidup per Tahun (%)", value=3.0, step=0.1)
+        naik_gaji = st.number_input("Kenaikan Gaji per Tahun (%)", value=5.0, step=0.1, key='k_naik_gaji')
+        inflasi = st.number_input("Kenaikan Kebutuhan Hidup per Tahun (%)", value=3.0, step=0.1, key='k_inflasi')
 
     with col_kas2:
         st.subheader("h. Komponen Tambahan (Side Hustle)")
-        sh1 = st.number_input("1. Side Hustle 1 / Tahun", min_value=0, value=0, step=1000000)
-        sh2 = st.number_input("2. Side Hustle 2 / Tahun", min_value=0, value=0, step=1000000)
-        sh3 = st.number_input("3. Side Hustle 3 / Tahun", min_value=0, value=0, step=1000000)
-        sh4 = st.number_input("4. Side Hustle 4 / Tahun", min_value=0, value=0, step=1000000)
-        sh5 = st.number_input("5. Side Hustle 5 / Tahun", min_value=0, value=0, step=1000000)
+        sh1 = st.number_input("1. Side Hustle 1 / Tahun", min_value=0, value=0, step=1000000, key='k_sh1')
+        sh2 = st.number_input("2. Side Hustle 2 / Tahun", min_value=0, value=0, step=1000000, key='k_sh2')
+        sh3 = st.number_input("3. Side Hustle 3 / Tahun", min_value=0, value=0, step=1000000, key='k_sh3')
+        sh4 = st.number_input("4. Side Hustle 4 / Tahun", min_value=0, value=0, step=1000000, key='k_sh4')
+        sh5 = st.number_input("5. Side Hustle 5 / Tahun", min_value=0, value=0, step=1000000, key='k_sh5')
         
         total_tabungan = sh1 + sh2 + sh3 + sh4 + sh5
         st.metric("i. Total Tabungan Side Hustle Dasar", f"Rp {total_tabungan:,.0f}")
         
-        naik_sh = st.number_input("Kenaikan Side Hustle per Tahun (%)", value=5.0, step=0.1)
+        naik_sh = st.number_input("Kenaikan Side Hustle per Tahun (%)", value=5.0, step=0.1, key='k_naik_sh')
         
         tambahan_emergency = total_tabungan * 0.5
         st.metric("j. Tambahan Nilai Emergency (50% dari Poin i)", f"Rp {tambahan_emergency:,.0f}")
         
-        bunga_invest = st.number_input("Bunga Keuntungan Investasi SH (%)", value=10.0, step=0.1)
+        bunga_invest = st.number_input("Bunga Keuntungan Investasi SH (%)", value=10.0, step=0.1, key='k_bunga_sh')
         tambahan_investasi = total_tabungan * 0.5
         st.metric("k. Tambahan Investasi (50% dari Poin i)", f"Rp {tambahan_investasi:,.0f}")
 
