@@ -13,18 +13,19 @@ st.markdown("""
 [data-testid="stHeader"] { background-color: transparent !important; }
 p, h1, h2, h3, label, li, .stMarkdown, .stMetricLabel { color: #F8F9FA !important; }
 
-/* Kustomisasi Tombol Download Menjadi Kuning Elegan */
+/* Kustomisasi Tombol Download Menjadi Kuning Elegan dengan Teks Hitam */
 div[data-testid="stDownloadButton"] button {
     background-color: #FFD700 !important;
-    color: #000000 !important;
     border: none !important;
-    font-weight: bold !important;
     padding: 10px 24px !important;
     border-radius: 6px !important;
 }
+div[data-testid="stDownloadButton"] button p {
+    color: #000000 !important;
+    font-weight: bold !important;
+}
 div[data-testid="stDownloadButton"] button:hover {
     background-color: #FFC107 !important;
-    color: #000000 !important;
     border: none !important;
 }
 
@@ -215,10 +216,12 @@ with tab3:
     
     # Kalkulasi Titik Kritis
     be_lunas = df[df['Margin Murni'] > df['Sisa Hutang']]
-    teks_lunas = f"✅ :green[**Tahun ke-{int(be_lunas.iloc[0]['Tahun'])}**] - Profit sanggup tutup sisa hutang bank." if not be_lunas.empty else "❌ :red[**Belum Tercapai**]"
+    teks_lunas_raw = f"Tahun ke-{int(be_lunas.iloc[0]['Tahun'])}" if not be_lunas.empty else "Belum Tercapai"
+    teks_lunas = f"✅ :green[**{teks_lunas_raw}**] - Profit sanggup tutup sisa hutang bank." if not be_lunas.empty else "❌ :red[**Belum Tercapai**]"
     
-    be_bakar = df[df['Margin murni'] > df['Total Uang Terbakar']] if 'Margin murni' in df.columns else df[df['Margin Murni'] > df['Total Uang Terbakar']]
-    teks_bakar = f"✅ :green[**Tahun ke-{int(be_bakar.iloc[0]['Tahun'])}**] - Profit kalahkan semua cicilan." if not be_bakar.empty else "❌ :red[**Belum Tercapai**]"
+    be_bakar = df[df['Margin Murni'] > df['Total Uang Terbakar']]
+    teks_bakar_raw = f"Tahun ke-{int(be_bakar.iloc[0]['Tahun'])}" if not be_bakar.empty else "Belum Tercapai"
+    teks_bakar = f"✅ :green[**{teks_bakar_raw}**] - Profit kalahkan semua cicilan." if not be_bakar.empty else "❌ :red[**Belum Tercapai**]"
 
     st.markdown(f"""
     **1. Kapan margin lunasin sisa hutang?** {teks_lunas}  
@@ -359,7 +362,6 @@ with tab4:
     try:
         from fpdf import FPDF
         
-        # Inisialisasi builder PDF internal menggunakan variabel lokal yang sudah tervalidasi di atas
         class LaporanPDF(FPDF):
             def header(self):
                 self.set_font('Arial', 'B', 14)
@@ -378,37 +380,80 @@ with tab4:
         pdf.set_font("Arial", 'B', 11)
         pdf.cell(0, 8, "1. Sektor Pinjaman & Alokasi Capex (Tab 1)", 0, 1, 'L')
         pdf.set_font("Arial", size=10)
-        pdf.cell(0, 6, f"- Plafon Kredit Bank: Rp {plafon:,.0f}", 0, 1, 'L')
-        pdf.cell(0, 6, f"- Pengeluaran Alat/Capex: Rp {capex:,.0f}", 0, 1, 'L')
-        pdf.cell(0, 6, f"- Sisa Modal Kerja Aktif: Rp {st.session_state.modal_awal:,.0f}", 0, 1, 'L')
-        pdf.cell(0, 6, f"- Tenor Kredit Efektif: {tenor_bulan} Bulan ({tenor_bulan/12:.1f} Tahun)", 0, 1, 'L')
-        pdf.cell(0, 6, f"- Angsuran Pokok & Bunga Bank/Bln: Rp {potongan_2:,.0f}", 0, 1, 'L')
+        pdf.cell(0, 6, f"a. Plafon Kredit Bank: Rp {plafon:,.0f}", 0, 1, 'L')
+        pdf.cell(0, 6, f"b. Pengeluaran Alat/Capex: Rp {capex:,.0f}", 0, 1, 'L')
+        pdf.cell(0, 6, f"c. Sisa Modal Kerja Aktif: Rp {st.session_state.modal_awal:,.0f}", 0, 1, 'L')
+        pdf.cell(0, 6, f"d. Tenor Kredit Efektif: {tenor_bulan} Bulan ({tenor_bulan/12:.1f} Tahun)", 0, 1, 'L')
+        pdf.cell(0, 6, f"e. Angsuran Pokok & Bunga Bank/Bln: Rp {potongan_2:,.0f}", 0, 1, 'L')
         pdf.ln(3)
         
         # Bab 2
         pdf.set_font("Arial", 'B', 11)
-        pdf.cell(0, 8, "2. Sektor Portofolio Investasi Utama (Tab 2)", 0, 1, 'L')
+        pdf.cell(0, 8, "2. Sektor Portofolio Investasi Utama (Tab 2 & 3)", 0, 1, 'L')
         pdf.set_font("Arial", size=10)
-        pdf.cell(0, 6, f"- Modal Awal Pemutaran Dana Plafon: Rp {st.session_state.modal_awal:,.0f}", 0, 1, 'L')
-        pdf.cell(0, 6, f"- Asumsi Pertumbuhan Portofolio: {st.session_state.dividen_tahun}% per tahun", 0, 1, 'L')
-        pdf.cell(0, 6, f"- Jangka Waktu Pemutaran: {st.session_state.lama_investasi} Tahun", 0, 1, 'L')
+        pdf.cell(0, 6, f"a. Modal Awal Pemutaran Dana Plafon: Rp {st.session_state.modal_awal:,.0f}", 0, 1, 'L')
+        pdf.cell(0, 6, f"b. Asumsi Pertumbuhan Portofolio: {st.session_state.dividen_tahun}% per tahun", 0, 1, 'L')
+        pdf.cell(0, 6, f"c. Jangka Waktu Pemutaran: {st.session_state.lama_investasi} Tahun", 0, 1, 'L')
+        
         f_portfolio = df_invest.iloc[-1]['Total Portofolio'] if 'df_invest' in locals() else 0
-        pdf.cell(0, 6, f"- Proyeksi Nilai Akhir Portofolio Pokok: Rp {f_portfolio:,.0f}", 0, 1, 'L')
+        pdf.cell(0, 6, f"d. Proyeksi Nilai Akhir Portofolio Pokok: Rp {f_portfolio:,.0f}", 0, 1, 'L')
+        
+        pdf.cell(0, 6, f"e. Kesimpulan Analisis Leverage:", 0, 1, 'L')
+        pdf.cell(5, 6, "", 0, 0) # Indentasi
+        pdf.cell(0, 6, f"- Margin melunasi sisa hutang pada: {teks_lunas_raw}", 0, 1, 'L')
+        pdf.cell(5, 6, "", 0, 0) # Indentasi
+        pdf.cell(0, 6, f"- Margin mengalahkan uang dibakar pada: {teks_bakar_raw}", 0, 1, 'L')
         pdf.ln(3)
         
         # Bab 3
         pdf.set_font("Arial", 'B', 11)
         pdf.cell(0, 8, "3. Tata Kelola Arus Kas Pribadi & Side Hustle (Tab 4)", 0, 1, 'L')
         pdf.set_font("Arial", size=10)
-        pdf.cell(0, 6, f"- Gaji Bulanan: Rp {gaji:,.0f}", 0, 1, 'L')
-        pdf.cell(0, 6, f"- Beban Pinjaman Sektor Lain: Rp {potongan_1:,.0f}", 0, 1, 'L')
-        pdf.cell(0, 6, f"- Total Kewajiban Bulanan Gabungan: Rp {total_cicilan_gabungan:,.0f}", 0, 1, 'L')
-        pdf.cell(0, 6, f"- Anggaran Biaya Hidup/Bln: Rp {kebutuhan:,.0f}", 0, 1, 'L')
-        pdf.cell(0, 6, f"- Surplus Kas Bersih Bulanan (Tahun Pertama): Rp {sisa_perbulan:,.0f}", 0, 1, 'L')
-        pdf.cell(0, 6, f"- Total Pendapatan Dasar Side Hustle: Rp {total_tabungan:,.0f} / tahun", 0, 1, 'L')
-        pdf.cell(0, 6, f"- Pertumbuhan Alokasi Investasi SH: {bunga_invest}% per tahun (Mulai Tahun ke-2)", 0, 1, 'L')
+        pdf.cell(0, 6, f"a. Gaji Bulanan: Rp {gaji:,.0f}", 0, 1, 'L')
+        pdf.cell(0, 6, f"b. Beban Pinjaman Sektor Lain: Rp {potongan_1:,.0f}", 0, 1, 'L')
+        pdf.cell(0, 6, f"c. Total Kewajiban Bulanan Gabungan: Rp {total_cicilan_gabungan:,.0f}", 0, 1, 'L')
+        pdf.cell(0, 6, f"d. Anggaran Biaya Hidup/Bln: Rp {kebutuhan:,.0f}", 0, 1, 'L')
+        pdf.cell(0, 6, f"e. Surplus Kas Bersih Bulanan (Tahun Pertama): Rp {sisa_perbulan:,.0f}", 0, 1, 'L')
+        pdf.cell(0, 6, f"f. Total Pendapatan Dasar Side Hustle: Rp {total_tabungan:,.0f} / tahun", 0, 1, 'L')
+        
+        pdf.cell(0, 6, f"g. Pertumbuhan Alokasi Investasi (diambil 50% dari total Tabungan SH):", 0, 1, 'L')
+        pdf.cell(5, 6, "", 0, 0) # Indentasi
+        pdf.cell(0, 6, f"Asumsi Bunga {bunga_invest}% per tahun (Mulai berputar di Tahun ke-2)", 0, 1, 'L')
+        
+        pdf.cell(0, 6, f"h. Alokasi Dana Darurat/Emergency (sisa 50% dari Tabungan SH):", 0, 1, 'L')
+        pdf.cell(5, 6, "", 0, 0) # Indentasi
+        pdf.cell(0, 6, f"Dana ini disisihkan untuk kebutuhan mendesak dan dianggap habis terpakai.", 0, 1, 'L')
+        
         f_sh_assets = df_proyeksi.iloc[-1]['Akumulasi Investasi SH'] if 'df_proyeksi' in locals() else 0
-        pdf.cell(0, 6, f"- Proyeksi Nilai Akhir Kantong Investasi SH (Tahun 15): Rp {f_sh_assets:,.0f}", 0, 1, 'L')
+        pdf.cell(0, 6, f"i. Proyeksi Nilai Akhir Kantong Investasi SH (Tahun 15): Rp {f_sh_assets:,.0f}", 0, 1, 'L')
+        pdf.ln(5)
+
+        # Bab 4: Tabel Ringkasan
+        pdf.set_font("Arial", 'B', 11)
+        pdf.cell(0, 8, "4. Tabel Ringkasan Proyeksi Finansial Terkonsolidasi", 0, 1, 'L')
+        
+        # Header Tabel
+        pdf.set_font("Arial", 'B', 9)
+        pdf.cell(20, 8, "Tahun", 1, 0, 'C')
+        pdf.cell(55, 8, "Sisa Hutang Bank", 1, 0, 'C')
+        pdf.cell(60, 8, "Net Asset (Bebas Hutang)", 1, 0, 'C')
+        pdf.cell(55, 8, "Akumulasi Investasi SH", 1, 1, 'C')
+        
+        # Isi Tabel (Tahun 1, 5, 10, 15)
+        pdf.set_font("Arial", '', 9)
+        tahun_sampel = [1, 5, 10, 15]
+        
+        for t in tahun_sampel:
+            # Cegah error jika baris tahun tidak ada di dataframe
+            if t <= len(df) and t <= len(df_proyeksi):
+                s_hutang = df.loc[df['Tahun'] == t, 'Sisa Hutang'].values[0] if not df[df['Tahun'] == t].empty else 0
+                n_asset = df.loc[df['Tahun'] == t, 'Net Asset'].values[0] if not df[df['Tahun'] == t].empty else 0
+                a_sh = df_proyeksi.loc[df_proyeksi['Thn'] == t, 'Akumulasi Investasi SH'].values[0] if not df_proyeksi[df_proyeksi['Thn'] == t].empty else 0
+                
+                pdf.cell(20, 8, f"Tahun {t}", 1, 0, 'C')
+                pdf.cell(55, 8, f"Rp {s_hutang:,.0f}", 1, 0, 'R')
+                pdf.cell(60, 8, f"Rp {n_asset:,.0f}", 1, 0, 'R')
+                pdf.cell(55, 8, f"Rp {a_sh:,.0f}", 1, 1, 'R')
         
         # Generate biner stream dokumen tanpa menggunakan berkas penampung eksternal
         pdf_bytes = pdf.output(dest='S').encode('latin-1')
