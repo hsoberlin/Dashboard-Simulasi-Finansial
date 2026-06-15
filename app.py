@@ -266,26 +266,10 @@ with tab2:
         st.plotly_chart(fig_invest, use_container_width=True)
 
 # ==========================================
-# TAB 3: ANALISIS LEVERAGE & DOWNLOAD PDF
+# TAB 3: ANALISIS LEVERAGE
 # ==========================================
 with tab3:
     st.header("Profil Risiko & Kekuatan Margin")
-
-    # TOMBOL DOWNLOAD PDF DIPINDAH KE PALING ATAS TAB 3
-    st.markdown("### Laporan Konsolidasi PDF")
-    st.caption("Unduh ringkasan aset dan arus kas Anda dalam format dokumen.")
-    pdf_file_bytes = generate_pdf()
-    
-    if pdf_file_bytes:
-        st.download_button(
-            label="📄 UNDUH LAPORAN PDF",
-            data=pdf_file_bytes,
-            file_name="Laporan_Konsolidasi_Finansial.pdf",
-            mime="application/pdf"
-        )
-    else:
-        st.error("⚠️ Gagal memuat PDF. Anda harus menjalankan `pip install fpdf` di terminal/CMD Anda atau menambahkannya ke file `requirements.txt`.")
-    st.markdown("---")
     
     max_tahun = max(math.ceil(st.session_state.tenor_bulan_tab1 / 12), st.session_state.lama_investasi)
     data_cross = []
@@ -332,7 +316,6 @@ with tab3:
         legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1)
     )
     st.plotly_chart(fig, use_container_width=True)
-
 
 # ==========================================
 # TAB 4: ARUS KAS & SIDE HUSTLE
@@ -428,19 +411,16 @@ with tab4:
         else:
             saldo_invest = 0
             
-        # Kolom akumulasi emergency (Total Tabungan) sudah dihapus dari append data
         data_proyeksi.append([
             th, gaji_th, kebutuhan_th, total_cicilan_th, sisa_bln_th, 
             total_masuk_emergency, total_masuk_investasi, saldo_invest
         ])
         
-    # List nama kolom disesuaikan (tanpa Total Tabungan)
     df_proyeksi = pd.DataFrame(data_proyeksi, columns=[
         "Thn", "Gaji/Bln", "Kebutuhan/Bln", "Total Cicilan/Bln", "Sisa Bersih/Bln", 
         "Inflow Emergency", "Inflow Investasi SH", "Akumulasi Investasi SH"
     ])
     
-    # Format kamus dictionary disesuaikan
     format_dict_proyeksi = {
         "Thn": "{:.0f}",
         "Gaji/Bln": "Rp {:,.0f}",
@@ -453,3 +433,19 @@ with tab4:
     }
     
     st.dataframe(df_proyeksi.style.format(format_dict_proyeksi), use_container_width=True, height=350)
+    
+    # TOMBOL DOWNLOAD PDF DIPINDAH KE PALING BAWAH TAB 4
+    st.markdown("---")
+    st.subheader("Laporan Konsolidasi PDF")
+    st.caption("Unduh ringkasan aset dan arus kas Anda dalam format dokumen.")
+    pdf_file_bytes = generate_pdf()
+    
+    if pdf_file_bytes:
+        st.download_button(
+            label="📄 UNDUH LAPORAN PDF",
+            data=pdf_file_bytes,
+            file_name="Laporan_Konsolidasi_Finansial.pdf",
+            mime="application/pdf"
+        )
+    else:
+        st.error("⚠️ Gagal memuat PDF. Anda harus menjalankan `pip install fpdf` di terminal/CMD Anda atau menambahkannya ke file `requirements.txt`.")
