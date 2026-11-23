@@ -998,9 +998,81 @@ def run_nightly(state_path, out_path, now=None, raw=None, ihsg=None, wait=300):
 
 
 if __name__ == "__main__":
-    import sys
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    sp = args[0] if len(args) > 0 else "r2_state.json"
-    op = args[1] if len(args) > 1 else "r2_laporan.md"
-    run_nightly(sp, op)
-    print(open(op).read())
+    import streamlit as st
+
+    st.set_page_config(page_title=f"R2 Engine — {AKUN}", layout="wide")
+    st.title(f"R2 ENGINE — {AKUN}")
+    st.caption(f"Versi: {VERSION}")
+
+    sp = "r2_state.json"
+    op = "r2_laporan.md"
+
+    if not os.path.exists(sp):
+        st.error(f"File `{sp}` tidak ditemukan di direktori aplikasi. Pastikan nama file di GitHub menggunakan underscore (`r2_state.json`).")
+        st.stop()
+
+    # Baca ringkasan state saat ini tanpa download data
+    st_curr = state_from_json(open(sp).read())
+    eq_last = st_curr["equity"][-1]["eq"] if st_curr.get("equity") else st_curr.get("modal_awal", 0)
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Data Terakhir", st_curr.get("last_date") or "-")
+    c2.metric("Ekuitas Terakhir", rp(eq_last))
+    c3.metric("Kas Bebas", rp(st_curr.get("cash", 0)))
+    c4.metric("Posisi Aktif", f"{len(st_curr.get('pos', {}))} saham")
+
+    st.divider()
+
+    # Tombol eksekusi harian (download Yahoo + hitung sinyal + update state)
+    col_btn1, col_btn2 = st.columns([2, 3])
+    with col_btn1:
+        klik_run = st.button("Jalankan Update Malam (Run Nightly)", type="primary", use_container_width=True)
+    with col_btn2:
+        tunggu_detik = st.number_input("Jeda retry Yahoo Finance (detik)", min_value=5, max_value=300, value=30, step=5)
+
+    if klik_run:
+        with st.spinner("Mengunduh data seluruh emiten IDX dan menghitung sinyal R2 (estimasi 1–3 menit)..."):
+            res = run_nightly(sp, op, wait=int(tunggu_detik))
+        if res["status"] == "OK":
+            st.success(f"Selesai! {res['banner']}")
+            st.rerun()
+        elif res["status"] == "LIBUR":
+            st.info(res["msg"])
+        else:
+            st.warning(res["msg"])
+
+    # Tampilkan laporan jika file laporan sudah ada
+    if os.path.exists(op):
+        raw_rep = open(op).read()
+        tab_malam, tab_pagi, tab_raw, tab_state = st.tabs([
+            "Laporan Malam",
+            "Laporan Pagi (Pre-Opening)",
+            "Teks Mentah (.md)",
+            "Backup State (.json)"
+        ])
+
+        pagi_txt, malam_txt = raw_rep, raw_rep
+        if "=== PAGI ===" in raw_rep and "=== MALAM ===" in raw_rep:
+            bagian = raw_rep.split("=== PAGI ===")[1].split("=== MALAM ===")
+            pagi_txt = bagian[0].strip()
+            malam_txt = bagian[1].strip()
+
+        with tab_malam:
+            st.markdown(malam_txt)
+
+        with tab_pagi:
+            st.markdown(pagi_txt)
+
+        with tab_raw:
+            st.text_area("Salin teks laporan:", raw_rep, height=450)
+
+        with tab_state:
+            st.info("Penyimpanan lokal di Streamlit Cloud bersifat sementara. Unduh file ini setelah update malam berhasil jika ingin mem-backup atau meng-update file di GitHub.")
+            st.download_button(
+                label="Unduh r2_state.json Terbaru",
+                data=open(sp).read(),
+                file_name="r2_state.json",
+                mime="application/json"
+            )
+    else:
+        st.info("Belum ada file laporan (`r2_laporan.md`). Klik tombol **Jalankan Update Malam** di atas untuk memproses data hari ini.")
